@@ -1,28 +1,261 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOIA.io - Alejandro G. Ramiro Sechi | Experto en IA y Automatización para Empresas</title>
+    <meta name="description" content="Alejandro G. Ramiro Sechi es un experto en IA y automatizaciones que ayuda a empresas a escalar, ahorrar tiempo y multiplicar su rentabilidad. Descubre sus servicios, cursos y el exclusivo Área VIP.">
+    <link rel="canonical" href="https://yoia.io/">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+
     <script src="https://cdn.tailwindcss.com"></script>
-    <title>YO IA - Alejandro G. Ramiro Sechi</title>
+    <style>
+        /* Estilos personalizados para un look 'Dark Tech Premium' */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117; /* GitHub Dark Background */
+            color: #c9d1d9; /* Light gray text */
+        }
+        .text-gradient {
+            background: linear-gradient(to right, #00C6FF, #0072FF); /* Azul eléctrico */
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .btn-primary {
+            background: linear-gradient(to right, #00C6FF, #0072FF);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+        .border-gradient {
+            border-image: linear-gradient(to right, #00C6FF, #0072FF) 1;
+            border-width: 2px;
+            border-style: solid;
+        }
+        /* Animación de entrada sutil para elementos */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.8s ease-out forwards;
+        }
+        .delay-100 { animation-delay: 0.1s; }
+        .delay-200 { animation-delay: 0.2s; }
+        .delay-300 { animation-delay: 0.3s; }
+
+        /* Estilo para el área VIP */
+        .vip-card {
+            background-color: #161b22; /* Slightly lighter dark */
+            border: 1px solid #30363d;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+        .vip-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.3);
+            border-color: #0072FF;
+        }
+    </style>
 </head>
-<body class="bg-black text-white font-sans">
+<body class="bg-gradient-to-br from-[#0d1117] to-[#161b22] text-gray-200">
 
-    <nav class="p-6 flex justify-between items-center border-b border-gray-800">
-        <div class="text-2xl font-bold tracking-tighter">YO<span class="text-blue-500">IA</span>.io</div>
-        <div class="space-x-6">
-            <a href="#servicios" class="hover:text-blue-400">Servicios</a>
-            <a href="#vip" class="hover:text-blue-400 font-bold text-yellow-500 underline">ÁREA VIP</a>
+    <header class="sticky top-0 z-50 bg-[#0d1117]/80 backdrop-blur-sm shadow-lg border-b border-gray-800">
+        <nav class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <a href="#" class="text-4xl font-extrabold tracking-tight text-gradient">YO<span class="text-white">IA</span>.io</a>
+            <div class="space-x-8 text-lg font-medium">
+                <a href="#servicios" class="hover:text-blue-400 transition">Servicios</a>
+                <a href="#academia" class="hover:text-blue-400 transition">Academia</a>
+                <a href="#vip" class="py-2 px-4 rounded-full bg-blue-600 hover:bg-blue-700 transition">Área VIP</a>
+                <a href="#contacto" class="hover:text-blue-400 transition">Contacto</a>
+            </div>
+        </nav>
+    </header>
+
+    <section class="relative h-screen flex items-center justify-center text-center overflow-hidden">
+        <img src="./img/ia-banner.jpg" alt="Fondo de inteligencia artificial" class="absolute inset-0 w-full h-full object-cover opacity-30 blur-sm">
+        <div class="relative z-10 p-8 max-w-4xl animate-fade-in">
+            <p class="text-xl md:text-2xl mb-4 text-blue-300 animate-fade-in delay-100">
+                Alejandro G. Ramiro Sechi te ayuda a...
+            </p>
+            <h1 class="text-5xl md:text-7xl font-extrabold leading-tight text-white mb-6 animate-fade-in delay-200">
+                Escala tu Negocio. <span class="text-gradient">Automatiza tu Éxito.</span>
+            </h1>
+            <p class="text-lg md:text-xl text-gray-300 mb-10 animate-fade-in delay-300">
+                Diseño e implemento sistemas de Inteligencia Artificial y automatización que <span class="font-bold text-green-400">multiplican tu rentabilidad</span> y <span class="font-bold text-yellow-400">liberan tu tiempo</span>.
+            </p>
+            <div class="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-6 animate-fade-in delay-400">
+                <a href="#servicios" class="btn-primary text-white font-bold py-3 px-8 rounded-full text-lg shadow-lg">
+                    Ver Servicios
+                </a>
+                <a href="#contacto" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-full text-lg shadow-lg transition">
+                    Agenda una Consultoría Gratuita
+                </a>
+            </div>
         </div>
-    </nav>
-
-    <section class="py-20 text-center">
-        <h1 class="text-6xl font-extrabold mb-4">Automatización con Propósito.</h1>
-        <p class="text-xl text-gray-400 mb-8">Por Alejandro G. Ramiro Sechi, experto en IA para empresas.</p>
-        <button class="bg-blue-600 hover:bg-blue-700 px-8 py-4 rounded-full font-bold transition">
-            Transforma tu Negocio Ahora
-        </button>
     </section>
 
+    <section id="sobre-mi" class="py-20 bg-[#161b22] border-t border-gray-800">
+        <div class="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-12 items-center">
+            <div class="animate-fade-in delay-100">
+                <img src="./img/alejandro-profile.jpg" alt="Alejandro G. Ramiro Sechi" class="rounded-full w-64 h-64 mx-auto md:mx-0 object-cover border-4 border-blue-500 shadow-xl">
+            </div>
+            <div class="text-center md:text-left animate-fade-in delay-200">
+                <h2 class="text-4xl font-bold mb-4 text-white">¿Quién es Alejandro G. Ramiro Sechi?</h2>
+                <p class="text-lg text-gray-300 mb-4">
+                    Soy un apasionado de la Inteligencia Artificial y la automatización, con años de experiencia transformando la operativa de empresas. Mi misión es simple: <span class="font-semibold text-blue-400">democratizar el acceso a la eficiencia de la IA</span> para que tú y tu equipo se centren en lo que realmente importa: <span class="font-semibold text-green-400">innovar y crecer</span>.
+                </p>
+                <p class="text-lg text-gray-300">
+                    Desde la implementación de workflows con Make/Zapier hasta la optimización de LLMs personalizados, mi enfoque es siempre práctico y orientado a resultados tangibles.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <section id="servicios" class="py-20 bg-[#0d1117] border-t border-gray-800">
+        <div class="max-w-7xl mx-auto px-6 text-center">
+            <h2 class="text-5xl font-extrabold mb-6 text-gradient animate-fade-in">Mis Servicios de IA y Automatización</h2>
+            <p class="text-xl text-gray-300 mb-12 animate-fade-in delay-100">
+                No pierdas tiempo en tareas repetitivas. Yo construyo los sistemas que te impulsan.
+            </p>
+
+            <div class="grid md:grid-cols-3 gap-10">
+                <div class="vip-card p-8 animate-fade-in delay-200">
+                    <div class="text-6xl mb-6 text-blue-500">⚙️</div>
+                    <h3 class="text-2xl font-bold mb-4 text-white">Consultoría Estratégica IA</h3>
+                    <p class="text-gray-400">
+                        Identificamos dónde la IA puede generar el mayor impacto en tu negocio. Roadmap personalizado para tu transformación digital.
+                    </p>
+                    <a href="#contacto" class="mt-6 inline-block text-blue-400 hover:underline">Solicitar Consulta &rarr;</a>
+                </div>
+                <div class="vip-card p-8 animate-fade-in delay-300">
+                    <div class="text-6xl mb-6 text-green-500">🚀</div>
+                    <h3 class="text-2xl font-bold mb-4 text-white">Implementación de Automatizaciones</h3>
+                    <p class="text-gray-400">
+                        Conectamos tus herramientas (CRM, ERP, Marketing) con Make.com/Zapier para workflows eficientes y autónomos.
+                    </p>
+                    <a href="#contacto" class="mt-6 inline-block text-blue-400 hover:underline">Ver Casos de Éxito &rarr;</a>
+                </div>
+                <div class="vip-card p-8 animate-fade-in delay-400">
+                    <div class="text-6xl mb-6 text-purple-500">🎓</div>
+                    <h3 class="text-2xl font-bold mb-4 text-white">Formación y Despliegue de LLMs</h3>
+                    <p class="text-gray-400">
+                        Capacitamos a tu equipo y desplegamos Large Language Models (LLMs) personalizados para tus necesidades específicas.
+                    </p>
+                    <a href="#academia" class="mt-6 inline-block text-blue-400 hover:underline">Explorar Academia &rarr;</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="academia" class="py-20 bg-[#161b22] border-t border-gray-800">
+        <div class="max-w-7xl mx-auto px-6 text-center">
+            <h2 class="text-5xl font-extrabold mb-6 text-white animate-fade-in">Academia YOIA: Aprende y Domina la IA</h2>
+            <p class="text-xl text-gray-300 mb-12 animate-fade-in delay-100">
+                Explora mis cursos y tutoriales gratuitos para llevar tus habilidades al siguiente nivel.
+            </p>
+
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="vip-card p-6 text-left animate-fade-in delay-200">
+                    <iframe class="w-full h-48 rounded-lg mb-4" src="https://www.youtube.com/embed/VIDEO_ID_1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                    <h3 class="text-xl font-bold mb-2 text-white">Tutorial: Automatiza tus Leads con Make.com</h3>
+                    <p class="text-gray-400 text-sm">Aprende a conectar tus formularios de contacto directamente a tu CRM usando Make.com.</p>
+                    <a href="#" class="mt-4 inline-block text-blue-400 hover:underline">Ver Tutorial &rarr;</a>
+                </div>
+                <div class="vip-card p-6 text-left animate-fade-in delay-300">
+                    <iframe class="w-full h-48 rounded-lg mb-4" src="https://www.youtube.com/embed/VIDEO_ID_2" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                    <h3 class="text-xl font-bold mb-2 text-white">Guía: Crea un Chatbot Inteligente con LLMs</h3>
+                    <p class="text-gray-400 text-sm">Despliega un chatbot personalizado que responde a las preguntas frecuentes de tus clientes.</p>
+                    <a href="#" class="mt-4 inline-block text-blue-400 hover:underline">Ver Tutorial &rarr;</a>
+                </div>
+                <div class="vip-card p-6 text-left animate-fade-in delay-400">
+                    <iframe class="w-full h-48 rounded-lg mb-4" src="https://www.youtube.com/embed/VIDEO_ID_3" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                    <h3 class="text-xl font-bold mb-2 text-white">Review: Las 5 Mejores Herramientas de IA para Marketing</h3>
+                    <p class="text-gray-400 text-sm">Un análisis profundo de las plataformas esenciales para potenciar tu estrategia de marketing.</p>
+                    <a href="#" class="mt-4 inline-block text-blue-400 hover:underline">Ver Tutorial &rarr;</a>
+                </div>
+            </div>
+            <a href="https://www.youtube.com/@TuCanalDeYoutube" target="_blank" class="mt-12 inline-block btn-primary text-white font-bold py-3 px-8 rounded-full text-lg shadow-lg animate-fade-in delay-500">
+                Ver todos mis videos en YouTube
+            </a>
+        </div>
+    </section>
+
+    <section id="vip" class="py-20 bg-[#0d1117] border-t border-gray-800">
+        <div class="max-w-7xl mx-auto px-6 text-center">
+            <h2 class="text-5xl font-extrabold mb-6 text-gradient animate-fade-in">YOIA Insiders: Acceso a La Bóveda de Automatizaciones</h2>
+            <p class="text-xl text-gray-300 mb-12 animate-fade-in delay-100">
+                Tu atajo hacia la eficiencia. Contenido exclusivo para los que quieren ir un paso más allá.
+            </p>
+
+            <div class="vip-card p-10 max-w-3xl mx-auto text-left animate-fade-in delay-200">
+                <h3 class="text-3xl font-bold mb-4 text-white">¿Qué incluye tu Suscripción VIP?</h3>
+                <ul class="list-disc list-inside text-lg text-gray-300 space-y-3 mb-8">
+                    <li><span class="font-semibold text-blue-400">Biblioteca de Prompts Avanzados:</span> Accede a prompts optimizados para GPT, Claude, etc., listos para usar en ventas, marketing, RRHH y más.</li>
+                    <li><span class="font-semibold text-green-400">Blueprints de Automatización (Make/Zapier):</span> Plantillas y archivos JSON importables para replicar mis flujos de trabajo más potentes.</li>
+                    <li><span class="font-semibold text-yellow-400">Webinars Exclusivos:</span> Sesiones en vivo sobre las últimas tendencias y herramientas de IA.</li>
+                    <li><span class="font-semibold text-purple-400">Soporte Prioritario:</span> Resuelve tus dudas directamente conmigo.</li>
+                    <li><span class="font-semibold text-red-400">Acceso a Early-Access:</span> Sé el primero en probar mis nuevas herramientas y automatizaciones antes que nadie.</li>
+                </ul>
+                <div class="text-center">
+                    <a href="URL_A_TU_AREA_VIP_NOTION_O_PAGO" target="_blank" class="btn-primary text-white font-bold py-4 px-10 rounded-full text-xl shadow-xl hover:opacity-90 transform hover:scale-105 transition">
+                        Únete a YOIA Insiders Ahora
+                    </a>
+                    <p class="text-sm text-gray-500 mt-4">Suscripción mensual, cancela cuando quieras.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="contacto" class="py-20 bg-[#161b22] border-t border-gray-800">
+        <div class="max-w-xl mx-auto px-6 text-center animate-fade-in">
+            <h2 class="text-5xl font-extrabold mb-6 text-white">Hablemos de tu Próximo Salto con IA</h2>
+            <p class="text-xl text-gray-300 mb-12">
+                ¿Listo para transformar tu empresa? Reserva una sesión conmigo para explorar cómo la IA puede trabajar para ti.
+            </p>
+            <a href="URL_DE_TU_CALENDLY" target="_blank" class="btn-primary text-white font-bold py-4 px-10 rounded-full text-xl shadow-xl hover:opacity-90 transform hover:scale-105 transition">
+                Agenda tu Sesión Estratégica
+            </a>
+            <p class="text-sm text-gray-500 mt-6">También puedes contactarme directamente en <a href="mailto:info@yoia.io" class="text-blue-400 hover:underline">info@yoia.io</a></p>
+        </div>
+    </section>
+
+    <footer class="bg-[#0d1117] py-10 border-t border-gray-800 text-center text-gray-500 text-sm">
+        <p>&copy; 2024 YOIA.io - Alejandro G. Ramiro Sechi. Todos los derechos reservados.</p>
+        <div class="mt-4 space-x-4">
+            <a href="#" class="hover:text-blue-400">Política de Privacidad</a>
+            <a href="#" class="hover:text-blue-400">Términos y Condiciones</a>
+        </div>
+        <div class="mt-4 text-xs">
+            Desarrollado con <span class="text-red-500">❤️</span> por un experto en automatización.
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const observerOptions = {
+                root: null,
+                rootMargin: '0px',
+                threshold: 0.1 // El elemento es visible en un 10%
+            };
+
+            const observer = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('is-visible');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, observerOptions);
+
+            document.querySelectorAll('.animate-fade-in').forEach(el => {
+                el.classList.add('opacity-0'); // Ocultar inicialmente
+                observer.observe(el);
+            });
+        });
+    </script>
 </body>
 </html>
