@@ -1,0 +1,27 @@
+{
+    "name": "YO IA - Lead Automático (Webhook a Gmail)",
+    "flow": [
+        {
+            "id": 1,
+            "module": "gateway:CustomWebHook",
+            "metadata": {
+                "name": "Recepción de Lead"
+            }
+        },
+        {
+            "id": 2,
+            "module": "google-email:SendEmail",
+            "metadata": {
+                "name": "Notificación por Email"
+            },
+            "parameters": {
+                "subject": "Nuevo Lead detectado por YO IA",
+                "content": "Se ha recibido una nueva solicitud de acceso."
+            }
+        }
+    ],
+    "metadata": {
+        "version": 1,
+        "author": "Alejandro G. Ramiro Sechi - YOIA.io"
+    }
+}
