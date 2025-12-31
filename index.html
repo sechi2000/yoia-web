@@ -55,6 +55,29 @@
     </style>
 </head>
 
+<script>
+    // Función para que TODOS los botones de reserva funcionen
+    document.addEventListener('DOMContentLoaded', function () {
+
+        // 1. Seleccionamos todos los botones que deberían abrir el calendario
+        const botonesReserva = document.querySelectorAll('a[href*="calendar.app.google"], a[href="#contacto"], .btn-primary');
+
+        botonesReserva.forEach(boton => {
+            boton.addEventListener('click', function (e) {
+                // Si el enlace es externo (como tu calendario), dejamos que abra en pestaña nueva
+                // Pero nos aseguramos de que el enlace sea el correcto
+                if (this.hostname !== window.location.hostname || this.href.includes('calendar.app.google')) {
+                    return; // Deja que el navegador haga su trabajo
+                }
+
+                // Si es un botón interno, lo redirigimos a tu Google Calendar
+                e.preventDefault();
+                window.open('https://calendar.app.google/FmRhrsrxmWLBsD5X6', '_blank');
+            });
+        });
+    });
+</script>
+
 <body class="bg-[#0d1117]">
 
     <header class="sticky top-0 z-50 bg-[#0d1117]/90 backdrop-blur-md border-b border-gray-800">
