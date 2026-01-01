@@ -1,0 +1,48 @@
+{
+    "normal": {
+        "added": [
+            "refresh_pwa",
+            "ext__EmailHandler",
+            "enhancements__core_SendGrid",
+            "enhancements__core_SendGrid_desc",
+            "postmark_settings",
+            "postmark_server_api_key",
+            "postmark_server_api_key_suffix",
+            "postmark_track_opens",
+            "postmark_bulk_stream",
+            "postmark_transactional_stream",
+            "postmark_message_streams",
+            "postmark_api_error",
+            "postmark_message_description",
+            "postmark_stream_choose",
+            "enhancements__core_Postmark",
+            "enhancements__core_Postmark_desc",
+            "mail_method_postmark",
+            "mail_method_postmark_desc",
+            "mail_method_debug",
+            "pp_desc_Postmark",
+            "health_system_log_desc",
+            "health_error_log_desc",
+            "health_email_error_log_desc"
+        ],
+        "edited": [
+            "sendgrid_click_tracking",
+            "sendgrid_click_tracking_desc",
+            "health_intro"
+        ],
+        "removed": [
+            "enhancements__core_Sendgrid",
+            "enhancements__core_Sendgrid_desc",
+            "mail_method_cic",
+            "mail_method_cic_desc",
+            "log_loaded_hooks"
+        ]
+    },
+    "js": {
+        "added": [],
+        "edited": [
+            "health_check_summary"
+        ],
+        "removed": []
+    }
+}

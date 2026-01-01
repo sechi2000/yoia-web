@@ -1,0 +1,29 @@
+{
+    "files": {
+        "added": [
+            "core\/admin\/controllers\/stats\/ips.stats.downloadbutton.js",
+            "core\/admin\/controllers\/stats\/ips.stats.dynamicChart.mixin.js",
+            "core\/admin\/controllers\/stats\/ips.stats.liveDateFilter.js",
+            "core\/admin\/controllers\/stats\/ips.stats.overviewBlock.mixin.js"
+        ],
+        "edited": [
+            "global\/framework\/common\/ui\/ips.ui.autocomplete.js",
+            "global\/framework\/common\/ui\/ips.ui.captcha.js",
+            "global\/framework\/common\/ui\/ips.ui.chart.js",
+            "global\/framework\/common\/ui\/ips.ui.drawer.js",
+            "global\/framework\/common\/utils\/ips.utils.url.js",
+            "core\/admin\/controllers\/core\/ips.core.changeTheme.js",
+            "global\/admin\/controllers\/core\/ips.core.dynamicChart.js",
+            "core\/admin\/controllers\/members\/ips.members.lazyLoadingProfileBlock.js",
+            "core\/admin\/controllers\/stats\/ips.stats.overview.js",
+            "core\/admin\/controllers\/stats\/ips.stats.overviewBlock.js",
+            "global\/framework\/templates\/ips.core.templates.autocomplete.js"
+        ],
+        "removed": []
+    },
+    "orders": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

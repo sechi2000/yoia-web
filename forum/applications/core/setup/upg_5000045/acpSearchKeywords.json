@@ -1,0 +1,11 @@
+{
+    "added": [
+        "app=core&module=applications&controller=enhancements&do=edit&id=core_Postmark"
+    ],
+    "edited": [
+        "app=core&module=moderation&controller=spam",
+        "app=core&module=promotion&controller=sharelinks",
+        "app=core&module=settings&controller=general&searchResult=form_site_social_profiles"
+    ],
+    "removed": []
+}

@@ -1,0 +1,46 @@
+{
+    "html": {
+        "added": [
+            "front\/global\/mobileFooterNav"
+        ],
+        "edited": [
+            "front\/clubs\/clubCard",
+            "global\/forms\/codemirror",
+            "global\/forms\/editor",
+            "global\/forms\/editorTags",
+            "front\/forms\/row",
+            "global\/forms\/textarea",
+            "front\/global\/globalTemplate",
+            "front\/global\/mobileFooterBar",
+            "front\/global\/mobileNavigationChildren",
+            "front\/global\/userPhoto",
+            "admin\/memberprofile\/loginMethods",
+            "front\/myAttachments\/rows",
+            "front\/promote\/promotePublicTableRow",
+            "front\/system\/myAttachments",
+            "front\/system\/settings",
+            "front\/tags\/contentTableRows",
+            "front\/tags\/pinnedItem",
+            "front\/widgets\/mostContributions",
+            "front\/widgets\/tagRows"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "global\/framework\/3-compose.css",
+            "global\/framework\/3-data-tables.css",
+            "global\/framework\/3-forms.css",
+            "global\/framework\/3-images.css",
+            "global\/framework\/3-misc.css",
+            "global\/framework\/4-breadcrumb.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

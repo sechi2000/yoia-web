@@ -1,0 +1,22 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/topics\/post",
+            "front\/topics\/postContainer",
+            "front\/topics\/postHeader",
+            "front\/topics\/topic"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

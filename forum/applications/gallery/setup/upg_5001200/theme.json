@@ -1,0 +1,36 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/browse\/albumReviews",
+            "front\/browse\/categoriesSidebar",
+            "front\/browse\/imageTable",
+            "front\/forms\/commentUnavailable",
+            "front\/forms\/reviewTemplate",
+            "front\/global\/approvalQueueItem",
+            "front\/global\/comment",
+            "front\/global\/commentContainer",
+            "front\/global\/review",
+            "front\/global\/searchResultImageSnippet",
+            "front\/submit\/createAlbum",
+            "front\/submit\/wrapper",
+            "front\/view\/image",
+            "front\/view\/imageFrame",
+            "front\/view\/imageInfo",
+            "front\/view\/imageLightboxFrame",
+            "front\/view\/imageLightboxInfo",
+            "front\/view\/reviews"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

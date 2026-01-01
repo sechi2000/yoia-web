@@ -1,0 +1,21 @@
+{
+    "files": {
+        "added": [
+            "global\/framework\/common\/utils\/ips.utils.broadcastChannel.js"
+        ],
+        "edited": [
+            "global\/framework\/common\/ui\/ips.ui.spoiler.js",
+            "global\/framework\/common\/ui\/ips.ui.truncate.js",
+            "global\/front\/controllers\/core\/ips.core.app.js",
+            "global\/front\/controllers\/core\/ips.core.colorScheme.js",
+            "global\/front\/controllers\/core\/ips.core.commentFeed.js",
+            "global\/framework\/templates\/ips.core.templates.js"
+        ],
+        "removed": []
+    },
+    "orders": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

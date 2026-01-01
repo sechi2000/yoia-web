@@ -1,0 +1,39 @@
+{
+    "1": {
+        "method": "changeColumn",
+        "params": [
+            "core_custom_badges",
+            "icon",
+            {
+                "name": "icon",
+                "type": "TEXT",
+                "length": null,
+                "decimals": null,
+                "values": null,
+                "allow_null": true,
+                "default": null,
+                "comment": "",
+                "unsigned": false,
+                "auto_increment": false
+            }
+        ]
+    },
+    "2": {
+        "method": "addColumn",
+        "params": [
+            "core_groups",
+            {
+                "name": "g_icon_width",
+                "type": "SMALLINT",
+                "length": null,
+                "decimals": null,
+                "values": null,
+                "allow_null": true,
+                "default": null,
+                "comment": "",
+                "unsigned": true,
+                "auto_increment": false
+            }
+        ]
+    }
+}

@@ -1,0 +1,80 @@
+{
+    "html": {
+        "added": [
+            "front\/menu\/buttonsContent",
+            "front\/menu\/buttonsItem",
+            "front\/menu\/buttonsLink",
+            "front\/menu\/buttonsList"
+        ],
+        "edited": [
+            "front\/clubs\/coverPhotoOverlay",
+            "front\/clubs\/header",
+            "admin\/customization\/emoticons",
+            "admin\/forms\/select",
+            "front\/global\/carouselNavigation",
+            "front\/global\/embedExternal",
+            "front\/global\/globalTemplate",
+            "front\/global\/navBar",
+            "front\/global\/navBarItems",
+            "front\/global\/navigationPanel",
+            "global\/global\/offline",
+            "front\/global\/userBar",
+            "global\/login\/loginButton",
+            "admin\/memberprofile\/basicInformation",
+            "front\/menu\/menu",
+            "front\/popular\/memberRow",
+            "front\/profile\/profile",
+            "front\/profile\/profileClubs",
+            "front\/profile\/profileTabs",
+            "front\/promote\/promotePublicTable",
+            "front\/themeeditor\/editorPanel",
+            "front\/themeeditor\/themeEditorTemplate",
+            "front\/widgets\/achievements"
+        ],
+        "removed": [
+            "front\/global\/navBarInitialStyle"
+        ]
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "front\/core.css",
+            "admin\/customization\/emoticons.css",
+            "global\/framework\/1-3-variables.css",
+            "global\/framework\/1-4-colors.css",
+            "global\/framework\/1-5-global.css",
+            "global\/framework\/3-boxes.css",
+            "global\/framework\/3-buttons.css",
+            "global\/framework\/3-carousel.css",
+            "global\/framework\/3-compose.css",
+            "global\/framework\/3-cover-photo.css",
+            "global\/framework\/3-data-tables.css",
+            "global\/framework\/3-entries.css",
+            "global\/framework\/3-grid.css",
+            "global\/framework\/3-iconpicker.css",
+            "global\/framework\/3-images.css",
+            "global\/framework\/3-inputs.css",
+            "global\/framework\/3-lightbox.css",
+            "global\/framework\/3-loading.css",
+            "global\/framework\/3-menus.css",
+            "global\/framework\/3-pagination.css",
+            "global\/framework\/3-popup.css",
+            "global\/framework\/3-post-content.css",
+            "global\/framework\/3-rating.css",
+            "global\/framework\/3-step-bar.css",
+            "global\/framework\/4-breadcrumb.css",
+            "global\/framework\/4-header.css",
+            "global\/framework\/4-navigation-panel.css",
+            "global\/framework\/5-flex-grid-gap.css",
+            "global\/framework\/5-margin.css",
+            "admin\/members\/restrictions.css",
+            "front\/styles\/theme_editor.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

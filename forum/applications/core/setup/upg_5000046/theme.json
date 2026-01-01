@@ -1,0 +1,33 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "admin\/achievements\/awardField",
+            "admin\/achievements\/rulesForm",
+            "admin\/achievements\/rulesForm_addFilterButton",
+            "admin\/achievements\/rulesForm_filter",
+            "admin\/customization\/themeDescription",
+            "front\/global\/navBar",
+            "front\/global\/navBarItems",
+            "front\/themeeditor\/settingImage"
+        ],
+        "removed": [
+            "admin\/promotion\/advertisementMessage"
+        ]
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "admin\/achievements\/achievements.css",
+            "global\/framework\/1-3-variables.css",
+            "global\/framework\/4-header.css",
+            "global\/framework\/4-mobile-footer.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

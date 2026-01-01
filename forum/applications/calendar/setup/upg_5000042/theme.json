@@ -1,0 +1,23 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/browse\/calendarDay",
+            "front\/global\/manageFollowRow",
+            "front\/view\/eventBlock"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "front\/calendar.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

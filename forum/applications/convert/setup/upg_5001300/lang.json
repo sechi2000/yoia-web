@@ -1,0 +1,19 @@
+{
+    "normal": {
+        "added": [],
+        "edited": [],
+        "removed": [
+            "convert_forums_question_ratings",
+            "convert_forums_answer_ratings",
+            "_convert_forums_question_ratings",
+            "_convert_forums_answer_ratings",
+            "queue_recounting_question_ratings",
+            "queue_recounting_answer_ratings"
+        ]
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

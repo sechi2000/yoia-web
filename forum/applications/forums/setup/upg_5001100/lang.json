@@ -1,0 +1,24 @@
+{
+    "normal": {
+        "added": [
+            "r__autolock_settings",
+            "autolock",
+            "autolock_enabled",
+            "autolock_enabled_desc",
+            "autolock_days",
+            "autolock_days_suffix",
+            "autolock_pinned",
+            "autolock_featured",
+            "autolock_members",
+            "autolock_tags",
+            "autolock_forums"
+        ],
+        "edited": [],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

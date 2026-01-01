@@ -1,0 +1,27 @@
+{
+    "1": {
+        "method": "addColumn",
+        "params": [
+            "core_acp_search_index",
+            {
+                "name": "callback",
+                "type": "TEXT",
+                "length": null,
+                "decimals": null,
+                "values": null,
+                "allow_null": true,
+                "default": null,
+                "comment": "",
+                "unsigned": false,
+                "auto_increment": false
+            }
+        ]
+    },
+    "2": {
+        "method": "dropColumn",
+        "params": [
+            "core_widgets",
+            "default_area"
+        ]
+    }
+}

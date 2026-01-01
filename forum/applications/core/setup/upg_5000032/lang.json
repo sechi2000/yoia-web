@@ -1,0 +1,18 @@
+{
+    "normal": {
+        "added": [
+            "can_use_theme_editor"
+        ],
+        "edited": [
+            "enhancements__core_FacebookPixel",
+            "enhancements__core_FacebookPixel_desc",
+            "fb_pixel_id_req"
+        ],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

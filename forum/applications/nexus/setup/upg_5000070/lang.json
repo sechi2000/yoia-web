@@ -1,0 +1,16 @@
+{
+    "normal": {
+        "added": [
+            "ext__PackageType",
+            "extension_packagetype_table",
+            "extension_packagetype_table_desc"
+        ],
+        "edited": [],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

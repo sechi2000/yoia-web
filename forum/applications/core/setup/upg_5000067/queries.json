@@ -1,0 +1,102 @@
+{
+    "1": {
+        "method": "addColumn",
+        "params": [
+            "core_custom_badges",
+            {
+                "name": "icon_size",
+                "type": "TINYINT",
+                "length": null,
+                "decimals": null,
+                "values": null,
+                "allow_null": false,
+                "default": "1",
+                "comment": "relative size of the icon",
+                "unsigned": true,
+                "auto_increment": false
+            }
+        ]
+    },
+    "2": {
+        "method": "changeColumn",
+        "params": [
+            "core_custom_badges",
+            "icon_size",
+            {
+                "name": "icon_size",
+                "type": "TINYINT",
+                "length": null,
+                "decimals": null,
+                "values": null,
+                "allow_null": false,
+                "default": "3",
+                "comment": "relative size of the icon",
+                "unsigned": true,
+                "auto_increment": false
+            }
+        ]
+    },
+    "3": {
+        "method": "changeColumn",
+        "params": [
+            "core_custom_badges",
+            "icon_size",
+            {
+                "name": "icon_size",
+                "type": "TINYINT",
+                "length": null,
+                "decimals": null,
+                "values": null,
+                "allow_null": false,
+                "default": "3",
+                "comment": "relative size of the icon",
+                "unsigned": true,
+                "auto_increment": false
+            }
+        ]
+    },
+    "4": {
+        "method": "addColumn",
+        "params": [
+            "core_pfields_data",
+            {
+                "name": "pf_contains_pii",
+                "type": "TINYINT",
+                "length": null,
+                "decimals": null,
+                "values": null,
+                "allow_null": true,
+                "default": "0",
+                "comment": "",
+                "unsigned": false,
+                "auto_increment": false
+            }
+        ]
+    },
+    "5": {
+        "method": "changeColumn",
+        "params": [
+            "core_custom_badges",
+            "shape",
+            {
+                "name": "shape",
+                "type": "ENUM",
+                "length": null,
+                "decimals": null,
+                "values": [
+                    "square",
+                    "circle",
+                    "ngon",
+                    "star",
+                    "flower",
+                    "no_shape"
+                ],
+                "allow_null": false,
+                "default": "circle",
+                "comment": "",
+                "unsigned": false,
+                "auto_increment": false
+            }
+        ]
+    }
+}

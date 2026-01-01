@@ -1,0 +1,57 @@
+{
+    "normal": {
+        "added": [
+            "siteprofilelink_bluesky",
+            "siteprofilelink_tiktok",
+            "bluesky_text",
+            "post_before_registering_captcha_req",
+            "editor_r__tables",
+            "login_after_inactivity_notification",
+            "mailsub__core_loginAfterInactivity",
+            "login_after_inactivity_email_intro",
+            "login_after_inactivity_delete_text",
+            "club_resend_invitation",
+            "history_invited_to_club",
+            "history_invite_club_canceled",
+            "history_left_club",
+            "history_request_club",
+            "history_decline_club"
+        ],
+        "edited": [
+            "reg_confirm_email_desc",
+            "enhancements_ips",
+            "bot_antispam_type_desc",
+            "login_handler_Twitter",
+            "history_added_to_club"
+        ],
+        "removed": [
+            "guest_captcha",
+            "guest_captcha_desc"
+        ]
+    },
+    "js": {
+        "added": [
+            "editor_tool--table",
+            "editor_tool--tableOptions",
+            "editor_tool--globalTableOptions",
+            "editor_tool--tableRowOptions",
+            "editor_tool--tableCellOptions",
+            "editor_tool--tableColumnOptions",
+            "editor_tool--table-deleteTable",
+            "editor_tool--table-deleteTable--confirm",
+            "editor_tool--table-addRowBefore",
+            "editor_tool--table-addRowAfter",
+            "editor_tool--table-deleteRow",
+            "editor_tool--table-toggleHeaderRow",
+            "editor_tool--table-addColumnBefore",
+            "editor_tool--table-addColumnAfter",
+            "editor_tool--table-deleteColumn",
+            "editor_tool--table-toggleHeaderColumn",
+            "editor_tool--table-splitCell",
+            "editor_tool--table-mergeCells",
+            "editor_tool--table-toggleHeaderCell"
+        ],
+        "edited": [],
+        "removed": []
+    }
+}

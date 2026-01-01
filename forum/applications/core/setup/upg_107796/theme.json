@@ -1,0 +1,25 @@
+{
+    "html": {
+        "added": [
+            "global\/global\/swOffline"
+        ],
+        "edited": [
+            "front\/alerts\/alertModal",
+            "front\/modcp\/alertRow",
+            "front\/search\/filters"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "resources": {
+        "added": [
+            "admin\/enhancements\/postmark.png"
+        ],
+        "edited": [],
+        "removed": []
+    }
+}

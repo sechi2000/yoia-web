@@ -1,0 +1,26 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/modcp\/report",
+            "admin\/support\/supportPatchWrapper",
+            "front\/tables\/rows",
+            "front\/tags\/contentTableRows",
+            "front\/themeeditor\/themeEditorTemplate"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "global\/framework\/3-data-tables.css",
+            "global\/framework\/3-lightbox.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

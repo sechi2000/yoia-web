@@ -1,0 +1,50 @@
+{
+    "normal": {
+        "added": [
+            "prune_known_ips_desc",
+            "siteprofilelink_bluesky",
+            "siteprofilelink_tiktok",
+            "filehandler__Backblaze",
+            "filehandler__Backblaze_desc",
+            "filehandler__Backblaze_bucket",
+            "filehandler__Backblaze_bucket_desc",
+            "filehandler__Backblaze_endpoint",
+            "filehandler__Backblaze_endpoint_desc",
+            "filehandler__Backblaze_bucket_path",
+            "filehandler__Backblaze_bucket_path_desc",
+            "filehandler__Backblaze_access_key",
+            "filehandler__Backblaze_access_key_desc",
+            "filehandler__Backblaze_secret_key",
+            "filehandler__Backblaze_toggle",
+            "filehandler__Backblaze_toggle_desc",
+            "filehandler__Backblaze_custom_url",
+            "bluesky_text",
+            "emailtpl_notification_account_del_request_rejected",
+            "emailtpl_notification_pii_data_rejected",
+            "emailtpl_account_deletion_confirmation",
+            "emailtpl_loginAfterInactivity",
+            "emailtpl_acp_notification_PiiDataRequest",
+            "emailtpl_notification_pii_data",
+            "emailtpl_notification_report_content_author",
+            "emailtpl_acp_notification_AccountDeletion",
+            "emailtpl_notification_report_outcome"
+        ],
+        "edited": [
+            "login_handler_Twitter",
+            "enhancements_ips",
+            "emoji_style_twemoji",
+            "enhancements__core_FacebookPixel",
+            "enhancements__core_FacebookPixel_desc",
+            "fb_pixel_id_req"
+        ],
+        "removed": [
+            "guest_captcha",
+            "guest_captcha_desc"
+        ]
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

@@ -1,0 +1,80 @@
+{
+    "1": {
+        "method": "addColumn",
+        "params": [
+            "core_theme_editor_categories",
+            {
+                "name": "cat_name",
+                "type": "VARCHAR",
+                "length": 255,
+                "decimals": null,
+                "values": null,
+                "allow_null": true,
+                "default": null,
+                "comment": "",
+                "unsigned": false,
+                "auto_increment": false
+            }
+        ]
+    },
+    "2": {
+        "method": "addColumn",
+        "params": [
+            "core_theme_editor_settings",
+            {
+                "name": "setting_name",
+                "type": "VARCHAR",
+                "length": 255,
+                "decimals": null,
+                "values": null,
+                "allow_null": true,
+                "default": null,
+                "comment": "",
+                "unsigned": false,
+                "auto_increment": false
+            }
+        ]
+    },
+    "3": {
+        "method": "addColumn",
+        "params": [
+            "core_theme_editor_settings",
+            {
+                "name": "setting_desc",
+                "type": "TEXT",
+                "length": null,
+                "decimals": null,
+                "values": null,
+                "allow_null": true,
+                "default": null,
+                "comment": "",
+                "unsigned": false,
+                "auto_increment": false
+            }
+        ]
+    },
+    "4": {
+        "method": "changeIndex",
+        "params": [
+            "core_theme_editor_settings",
+            "setting_key",
+            {
+                "type": "key",
+                "name": "setting_key",
+                "columns": [
+                    "setting_key"
+                ],
+                "length": [
+                    250
+                ]
+            }
+        ]
+    },
+    "5": {
+        "method": "dropColumn",
+        "params": [
+            "core_log",
+            "loaded_hooks"
+        ]
+    }
+}

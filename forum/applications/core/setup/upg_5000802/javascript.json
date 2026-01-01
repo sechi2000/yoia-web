@@ -1,0 +1,16 @@
+{
+    "files": {
+        "added": [],
+        "edited": [
+            "global\/framework\/common\/ui\/ips.ui.lightbox.js"
+        ],
+        "removed": [
+            "core\/admin\/controllers\/files\/ips.files.form.js"
+        ]
+    },
+    "orders": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

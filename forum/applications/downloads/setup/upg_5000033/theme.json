@@ -1,0 +1,25 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/browse\/featuredFile",
+            "front\/browse\/fileGrid",
+            "front\/browse\/indexBlock",
+            "front\/browse\/rows",
+            "front\/browse\/tableRow",
+            "front\/global\/manageFollowRow",
+            "admin\/nexus\/fileInfo"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

@@ -1,0 +1,23 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/global\/manageFollowRow",
+            "front\/submit\/submissionForm",
+            "front\/view\/reviews"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "front\/downloads.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

@@ -1,0 +1,22 @@
+{
+    "normal": {
+        "added": [
+            "statsreports_report_new_title_desc",
+            "statsreports_no_title_error",
+            "statsreports_title_in_use_error"
+        ],
+        "edited": [
+            "node_groups",
+            "node_group_name",
+            "club_node_selector_groups",
+            "node_groups_header_desc",
+            "statsreports_report_new"
+        ],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

@@ -1,0 +1,17 @@
+{
+    "normal": {
+        "added": [],
+        "edited": [
+            "ad_forum_listing",
+            "ad_topic_view"
+        ],
+        "removed": [
+            "moderator_actions"
+        ]
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

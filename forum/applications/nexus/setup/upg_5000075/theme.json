@@ -1,0 +1,33 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/clients\/addresses",
+            "front\/clients\/alternatives",
+            "front\/clients\/donations",
+            "front\/clients\/info",
+            "front\/clients\/invoice",
+            "front\/clients\/invoices",
+            "front\/clients\/purchase",
+            "front\/clients\/purchases",
+            "global\/forms\/addPaymentMethodForm",
+            "front\/store\/category",
+            "front\/store\/categoryContents",
+            "front\/store\/index",
+            "front\/store\/package",
+            "front\/store\/register",
+            "front\/subscription\/table"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

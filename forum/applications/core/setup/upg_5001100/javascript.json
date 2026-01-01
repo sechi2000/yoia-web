@@ -1,0 +1,42 @@
+{
+    "files": {
+        "added": [
+            "global\/framework\/common\/components\/latex.js",
+            "global\/framework\/common\/components\/latexNodeview.js",
+            "global\/framework\/common\/components\/pulltorefresh.js"
+        ],
+        "edited": [
+            "global\/library\/app.js",
+            "global\/framework\/common\/components\/card.js",
+            "global\/framework\/common\/ui\/ips.ui.alertMessage.js",
+            "global\/framework\/common\/ui\/ips.ui.autocomplete.js",
+            "global\/framework\/common\/ui\/ips.ui.dialog.js",
+            "global\/framework\/common\/ui\/ips.ui.editorv5.js",
+            "global\/framework\/common\/ui\/ips.ui.js",
+            "global\/framework\/common\/ui\/ips.ui.pageAction.js",
+            "global\/framework\/common\/ui\/ips.ui.tableOfContents.js",
+            "global\/framework\/common\/ui\/ips.ui.webcomponents.js",
+            "global\/framework\/common\/utils\/ips.utils.fileDownload.js",
+            "global\/framework\/common\/utils\/ips.utils.search.js",
+            "global\/admin\/controllers\/core\/ips.core.editorRestrictions.js",
+            "global\/front\/controllers\/core\/ips.core.comment.js",
+            "core\/front\/controllers\/core\/ips.core.moderation.js",
+            "core\/global\/controllers\/core\/ips.core.genericTable.js",
+            "core\/admin\/controllers\/developer\/ips.developer.details.js",
+            "global\/framework\/controllers\/editor\/ips.editor.mymediasection.js",
+            "core\/front\/controllers\/search\/ips.search.filters.js",
+            "core\/front\/controllers\/search\/ips.search.main.js",
+            "core\/admin\/controllers\/support\/ips.support.dashboard.js",
+            "core\/front\/controllers\/widgets\/ips.widgets.area.js",
+            "core\/front\/controllers\/widgets\/ips.widgets.carouselControls.js"
+        ],
+        "removed": [
+            "global\/framework\/common\/components\/pullToRefresh.js"
+        ]
+    },
+    "orders": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

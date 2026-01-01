@@ -1,0 +1,25 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/global\/userNav",
+            "admin\/invoices\/generate",
+            "front\/store\/cartContents",
+            "front\/store\/cartHeader",
+            "front\/store\/categoryContents",
+            "front\/subscription\/table",
+            "admin\/transactions\/status"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

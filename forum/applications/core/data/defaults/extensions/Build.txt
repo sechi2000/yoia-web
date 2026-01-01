@@ -1,0 +1,60 @@
+<?php
+/**
+ * @brief		Build process plugin
+ * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
+ * @copyright	(c) Invision Power Services, Inc.
+ * @license		https://www.invisioncommunity.com/legal/standards/
+ * @package		Invision Community
+{subpackage}
+ * @since		{date}
+ */
+
+namespace IPS\{app}\extensions\core\Build;
+
+/* To prevent PHP errors (extending class does not exist) revealing path */
+
+use IPS\Extensions\BuildAbstract;
+use IPS\Application\BuilderFilter;
+use RuntimeException;
+use function defined;
+
+if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+{
+	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	exit;
+}
+
+/**
+ * Build process plugin
+ */
+class {class} extends BuildAbstract
+{
+	/**
+	 * Build
+	 *
+	 * @return	void
+	 * @throws	RuntimeException
+	 */
+	public function build() : void
+	{
+	}
+
+	/**
+	* Should the current file/directory be included in the tar
+	*
+	* @return bool
+	*/
+	public function accept( BuilderFilter $current ): bool
+	{
+		return true;
+	}
+	
+	/**
+	 * Finish Build
+	 *
+	 * @return	void
+	 */
+	public function finish() : void
+	{
+	}
+}

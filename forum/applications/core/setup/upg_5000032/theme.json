@@ -1,0 +1,41 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "global\/forms\/editorAttachmentsPlaceholder",
+            "front\/forms\/postingInformation",
+            "front\/forms\/reviewTemplate",
+            "front\/forms\/row",
+            "front\/global\/analytics",
+            "front\/global\/featuredComment",
+            "front\/global\/featuredComments",
+            "front\/global\/globalTemplate",
+            "front\/global\/guestCommentTeaser",
+            "front\/global\/tags"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "front\/core.css",
+            "global\/framework\/3-carousel.css",
+            "global\/framework\/3-compose.css",
+            "global\/framework\/3-data-tables.css",
+            "global\/framework\/3-entries.css",
+            "global\/framework\/3-forms.css",
+            "global\/framework\/3-rating.css",
+            "global\/framework\/3-tabs.css",
+            "global\/framework\/3-truncate.css",
+            "global\/framework\/4-footer.css",
+            "global\/framework\/4-layout.css",
+            "global\/framework\/5-typography.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

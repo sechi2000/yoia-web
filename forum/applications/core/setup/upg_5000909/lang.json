@@ -1,0 +1,15 @@
+{
+    "normal": {
+        "added": [
+            "webhook_content_reaction_added",
+            "webhook_content_reaction_removed"
+        ],
+        "edited": [],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

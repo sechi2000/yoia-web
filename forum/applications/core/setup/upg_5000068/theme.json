@@ -1,0 +1,45 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/forms\/popupTemplate",
+            "admin\/forms\/template",
+            "front\/global\/mobileNavigationChildren",
+            "front\/global\/navBarChildren",
+            "front\/global\/navColumnChildren",
+            "global\/global\/poll",
+            "admin\/global\/tabs",
+            "global\/login\/mfaSetup",
+            "global\/login\/mfaSetupOptOut",
+            "admin\/memberprofile\/groups",
+            "front\/profile\/recentVisitorsBlock",
+            "front\/sharelinks\/shareButton",
+            "admin\/support\/dashboard",
+            "front\/widgets\/streamItem"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "front\/core.css",
+            "admin\/core\/global.css",
+            "admin\/core\/zzz-admin-only.css",
+            "global\/framework\/3-buttons.css",
+            "global\/framework\/3-data-tables.css",
+            "global\/framework\/3-editor.css",
+            "global\/framework\/3-engagement.css",
+            "global\/framework\/3-forms.css",
+            "global\/framework\/3-page-header.css",
+            "global\/framework\/3-popup.css",
+            "global\/framework\/3-streams.css",
+            "global\/framework\/4-mobile-footer.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

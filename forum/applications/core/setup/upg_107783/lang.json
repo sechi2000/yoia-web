@@ -1,0 +1,17 @@
+{
+    "normal": {
+        "added": [
+            "post_before_registering_captcha_req"
+        ],
+        "edited": [
+            "bot_antispam_type_desc",
+            "guest_captcha_desc"
+        ],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

@@ -1,0 +1,29 @@
+{
+    "normal": {
+        "added": [
+            "reporting_content_notifications_blurb",
+            "report_author_notification_title",
+            "acplog__report_author_notification_edited",
+            "acplog__report_author_notification_created",
+            "acplog__report_author_notification_deleted",
+            "report_notifications_title",
+            "report_notifications_text",
+            "report_notifications_title_desc",
+            "report_notifications_text_desc",
+            "modal_author__notification",
+            "modal_author_notification_desc",
+            "modal_author_notification_none",
+            "modal_author_notification_form_submit",
+            "mailsub__core_notification_report_content_author"
+        ],
+        "edited": [],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [
+            "report_status_change_confirm"
+        ],
+        "removed": []
+    }
+}

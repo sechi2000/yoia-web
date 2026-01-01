@@ -1,0 +1,38 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/checkout\/checkoutOrderSummary",
+            "front\/checkout\/checkoutWrapper",
+            "front\/checkout\/confirmAndPay",
+            "front\/checkout\/couponForm",
+            "front\/checkout\/customerInformation",
+            "front\/checkout\/customerInformationForm",
+            "front\/checkout\/orderReview",
+            "front\/checkout\/paymentForm",
+            "front\/checkout\/transactionWait",
+            "admin\/customers\/invoices",
+            "admin\/customers\/invoicesTableRows",
+            "admin\/invoices\/status",
+            "front\/purchases\/giftvoucherPrint",
+            "front\/store\/cart",
+            "front\/store\/cartContents",
+            "front\/store\/cartReview"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "front\/checkout.css",
+            "admin\/customer.css",
+            "front\/nexus.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

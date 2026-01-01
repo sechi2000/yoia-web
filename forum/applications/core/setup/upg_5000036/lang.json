@@ -1,0 +1,28 @@
+{
+    "normal": {
+        "added": [
+            "acp_close_search",
+            "devscan__strings_moderatorpermission",
+            "devscan__strings_achievementaction",
+            "devscan__strings_adminnotifications",
+            "devscan__strings_communityenhancements",
+            "devscan__strings_dashboard",
+            "devscan__strings_editorlocations",
+            "devscan__strings_editormedia",
+            "devscan__strings_groupform",
+            "devscan__strings_ipaddresses",
+            "devscan__strings_livesearch",
+            "devscan__strings_memberacpprofiletabs",
+            "devscan__strings_mfaarea"
+        ],
+        "edited": [],
+        "removed": []
+    },
+    "js": {
+        "added": [
+            "form_color_datatransfer_fail"
+        ],
+        "edited": [],
+        "removed": []
+    }
+}

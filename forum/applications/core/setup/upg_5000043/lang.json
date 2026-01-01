@@ -1,0 +1,15 @@
+{
+    "normal": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "js": {
+        "added": [
+            "core_pagebuilder_nobox-enable",
+            "core_pagebuilder_nobox-disable"
+        ],
+        "edited": [],
+        "removed": []
+    }
+}

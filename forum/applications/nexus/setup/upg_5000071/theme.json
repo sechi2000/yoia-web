@@ -1,0 +1,20 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/checkout\/confirmAndPay",
+            "global\/forms\/creditCard"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

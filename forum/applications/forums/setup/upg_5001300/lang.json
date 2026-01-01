@@ -1,0 +1,22 @@
+{
+    "normal": {
+        "added": [
+            "large_topic_new_title",
+            "large_topic_warning_message",
+            "large_topic_closing_message",
+            "large_topic_message",
+            "large_topic_sidebar_title"
+        ],
+        "edited": [],
+        "removed": [
+            "archive_topic_rating",
+            "archive_not_topic_rating",
+            "rate_this_topic"
+        ]
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

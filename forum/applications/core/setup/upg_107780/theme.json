@@ -1,0 +1,39 @@
+{
+    "html": {
+        "added": [
+            "admin\/support\/v5"
+        ],
+        "edited": [
+            "global\/forms\/checkbox",
+            "global\/forms\/rating",
+            "front\/global\/analytics",
+            "front\/global\/comment",
+            "front\/global\/commentContainer",
+            "global\/global\/rank",
+            "front\/global\/review",
+            "front\/global\/reviewContainer",
+            "front\/global\/sharemenu",
+            "front\/modcp\/report",
+            "front\/modcp\/reportListOverview",
+            "front\/modcp\/reportTableDescription",
+            "front\/modcp\/reportToggle",
+            "front\/profile\/profileHeader",
+            "front\/sharelinks\/shareButton",
+            "admin\/support\/supportBlockList",
+            "front\/system\/searchResult"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "admin\/support\/dashboard.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

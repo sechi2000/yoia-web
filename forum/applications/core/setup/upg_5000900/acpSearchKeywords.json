@@ -1,0 +1,10 @@
+{
+    "added": [],
+    "edited": [
+        "app=core&module=moderation&controller=spam&searchResult=bot_antispam_type",
+        "app=core&module=moderation&controller=spam&tab=captcha",
+        "app=core&module=settings&controller=general&searchResult=form_site_online",
+        "app=core&module=settings&controller=posting&tab=simplifiedMode&searchResult=form_editor_r__table"
+    ],
+    "removed": []
+}

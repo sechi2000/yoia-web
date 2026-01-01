@@ -1,0 +1,20 @@
+{
+    "files": {
+        "added": [],
+        "edited": [
+            "global\/framework\/common\/ui\/ips.ui.editorv5.js",
+            "global\/framework\/common\/utils\/ips.utils.iconpicker.js",
+            "global\/front\/controllers\/core\/ips.core.commentFeed.js",
+            "core\/front\/controllers\/streams\/ips.streams.main.js",
+            "global\/framework\/templates\/ips.core.templates.js"
+        ],
+        "removed": [
+            "core\/front\/controllers\/core\/ips.core.onlineUsersWidget.js"
+        ]
+    },
+    "orders": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

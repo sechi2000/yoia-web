@@ -1,0 +1,19 @@
+{
+    "normal": {
+        "added": [
+            "link_your_accounts_email_validation",
+            "link_your_accounts_email_time_limit",
+            "mailsub__core_loginLinkValidate",
+            "email_loginlink_validate"
+        ],
+        "edited": [],
+        "removed": [
+            "link_your_accounts_cannot_complete"
+        ]
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

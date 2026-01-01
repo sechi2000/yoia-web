@@ -1,0 +1,67 @@
+{
+    "html": {
+        "added": [
+            "front\/global\/navBarInitialStyle"
+        ],
+        "edited": [
+            "global\/forms\/editorAttachments",
+            "front\/forms\/row",
+            "front\/forms\/template",
+            "front\/global\/globalTemplate",
+            "global\/global\/includeJS",
+            "front\/global\/navBar",
+            "front\/global\/navBarItems",
+            "global\/members\/ipLookup",
+            "front\/messaging\/template",
+            "front\/modcp\/alertRow",
+            "front\/modcp\/deletedRows",
+            "front\/streams\/filterForm",
+            "front\/streams\/filterFormClubs",
+            "front\/streams\/filterFormContentTypeContent",
+            "front\/streams\/filterFormShowMe",
+            "front\/streams\/filterInlineForm",
+            "front\/streams\/streamWrapper",
+            "front\/system\/notificationSettingsType",
+            "front\/system\/reauthenticate",
+            "front\/system\/settings",
+            "front\/system\/settingsEmail",
+            "front\/system\/settingsMfaPassword",
+            "front\/system\/settingsPassword",
+            "front\/themeeditor\/themeEditorTemplate",
+            "front\/widgets\/activeUsers",
+            "front\/widgets\/builderWrapper",
+            "front\/widgets\/whosOnline"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "admin\/core\/zzz-admin-only.css",
+            "global\/framework\/3-badges.css",
+            "global\/framework\/3-boxes.css",
+            "global\/framework\/3-buttons.css",
+            "global\/framework\/3-carousel.css",
+            "global\/framework\/3-compose.css",
+            "global\/framework\/3-cover-photo.css",
+            "global\/framework\/3-data-tables.css",
+            "global\/framework\/3-editor.css",
+            "global\/framework\/3-entries.css",
+            "global\/framework\/3-forms.css",
+            "global\/framework\/3-iconpicker.css",
+            "global\/framework\/3-images.css",
+            "global\/framework\/3-menus.css",
+            "global\/framework\/3-popup.css",
+            "global\/framework\/3-tables.css",
+            "global\/framework\/4-header.css",
+            "front\/styles\/modcp.css",
+            "front\/styles\/streams.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

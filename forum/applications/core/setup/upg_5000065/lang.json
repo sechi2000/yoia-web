@@ -1,0 +1,16 @@
+{
+    "normal": {
+        "added": [
+            "ipaddress_no_permission",
+            "webhook_contentitem_edited",
+            "webhook_contentitem_modaction"
+        ],
+        "edited": [],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

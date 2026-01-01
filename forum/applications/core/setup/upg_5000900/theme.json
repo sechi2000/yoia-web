@@ -1,0 +1,91 @@
+{
+    "html": {
+        "added": [
+            "global\/forms\/captchaTurnstile",
+            "admin\/reports\/overviewStatisticBlock",
+            "admin\/reports\/reportSelector",
+            "admin\/reports\/savedStatBlocks",
+            "admin\/reports\/statBlockButton"
+        ],
+        "edited": [
+            "admin\/activitystats\/overview",
+            "front\/clubs\/membersRows",
+            "front\/clubs\/view",
+            "global\/forms\/number",
+            "admin\/forms\/template",
+            "front\/forms\/template",
+            "front\/global\/announcementTop",
+            "global\/global\/chart",
+            "global\/global\/dynamicChart",
+            "admin\/global\/globalTemplate",
+            "front\/global\/globalTemplate",
+            "front\/global\/mobileFooterBar",
+            "admin\/global\/mobileNavigation",
+            "front\/global\/mobileNavigationChildren",
+            "global\/global\/pagination",
+            "front\/global\/userPhoto",
+            "global\/members\/dateFilters",
+            "admin\/members\/memberListResultsInfobox",
+            "front\/profile\/profileTabs",
+            "admin\/stats\/filtersOverviewForm",
+            "admin\/stats\/mycharts",
+            "admin\/stats\/overview",
+            "front\/streams\/streamItems",
+            "front\/system\/coppa",
+            "front\/system\/coppaForm",
+            "front\/system\/login",
+            "front\/system\/settingsOverview",
+            "front\/tables\/rows",
+            "admin\/tables\/table",
+            "front\/tags\/view",
+            "front\/themeeditor\/themeEditorTemplate",
+            "front\/widgets\/mostSolved",
+            "front\/widgets\/mostSolvedRows",
+            "front\/widgets\/topContributorRows",
+            "front\/widgets\/topContributors"
+        ],
+        "removed": [
+            "admin\/support\/fixMd5",
+            "admin\/support\/fixMd5Download",
+            "admin\/system\/upgradeDeltaMd5"
+        ]
+    },
+    "css": {
+        "added": [
+            "admin\/system\/reports.css"
+        ],
+        "edited": [
+            "admin\/core\/global.css",
+            "admin\/core\/zzz-admin-only.css",
+            "global\/framework\/1-3-variables.css",
+            "global\/framework\/1-5-global.css",
+            "global\/framework\/3-buttons.css",
+            "global\/framework\/3-compose.css",
+            "global\/framework\/3-data-tables.css",
+            "global\/framework\/3-editor.css",
+            "global\/framework\/3-entries.css",
+            "global\/framework\/3-inputs.css",
+            "global\/framework\/3-lightbox.css",
+            "global\/framework\/3-menus.css",
+            "global\/framework\/3-messages.css",
+            "global\/framework\/3-misc.css",
+            "global\/framework\/3-post-content.css",
+            "global\/framework\/3-streams.css",
+            "global\/framework\/3-tables.css",
+            "global\/framework\/3-tabs.css",
+            "global\/framework\/3-typography.css",
+            "global\/framework\/4-footer.css",
+            "global\/framework\/4-header.css",
+            "global\/framework\/4-offcanvas.css",
+            "front\/styles\/profiles.css",
+            "front\/styles\/theme_editor.css",
+            "admin\/system\/statistics.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

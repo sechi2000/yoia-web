@@ -1,0 +1,28 @@
+{
+    "normal": {
+        "added": [
+            "link_your_accounts_cannot_complete",
+            "acplog__members_added_login",
+            "import_login_links",
+            "import_login_link_in_use",
+            "import_login_links_suffix",
+            "add_account_integration",
+            "add_login_link",
+            "add_login_link_handler",
+            "add_login_link_identifier",
+            "add_login_link_identifier_desc",
+            "login_identifier_none",
+            "login_identifier_exists"
+        ],
+        "edited": [
+            "acplog__members_edited_login",
+            "acplog__members_edited_login_unlink"
+        ],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

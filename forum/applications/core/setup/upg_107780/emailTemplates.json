@@ -1,0 +1,10 @@
+{
+    "added": [
+        "notification_report_outcome",
+        "loginAfterInactivity"
+    ],
+    "edited": [
+        "_genericContent"
+    ],
+    "removed": []
+}

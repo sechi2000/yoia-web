@@ -1,0 +1,25 @@
+{
+    "1": {
+        "method": "dropColumn",
+        "params": [
+            "core_message_topics",
+            "mt_is_draft"
+        ]
+    },
+    "2": {
+        "method": "dropColumn",
+        "params": [
+            "core_message_topics",
+            "mt_hasattach"
+        ]
+    },
+    "3": {
+        "method": "delete",
+        "params": [
+            "core_theme_templates",
+            [
+                "template_set_id > 0"
+            ]
+        ]
+    }
+}

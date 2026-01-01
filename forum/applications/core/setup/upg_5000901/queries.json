@@ -1,0 +1,214 @@
+{
+	"1": {
+		"method": "createTable",
+		"params": [
+			{
+				"name": "core_saved_overview_stats",
+				"columns": {
+					"id": {
+						"name": "id",
+						"type": "BIGINT",
+						"length": "20",
+						"unsigned": true,
+						"allow_null": false,
+						"default": null,
+						"auto_increment": true,
+						"comment": "ID Number"
+					},
+					"stat_subblock": {
+						"name": "stat_subblock",
+						"type": "TINYTEXT",
+						"length": null,
+						"decimals": null,
+						"values": null,
+						"allow_null": false,
+						"default": null,
+						"comment": "",
+						"unsigned": false,
+						"auto_increment": false
+					},
+					"stat_extension": {
+						"name": "stat_extension",
+						"type": "TINYTEXT",
+						"length": 255,
+						"decimals": null,
+						"values": null,
+						"allow_null": false,
+						"default": null,
+						"comment": "",
+						"unsigned": false,
+						"auto_increment": false
+					},
+					"stat_app": {
+						"name": "stat_app",
+						"type": "TINYTEXT",
+						"length": 255,
+						"decimals": null,
+						"values": null,
+						"allow_null": false,
+						"default": null,
+						"comment": "",
+						"unsigned": false,
+						"auto_increment": false
+					},
+					"stat_report_id": {
+						"name": "stat_report_id",
+						"type": "BIGINT",
+						"length": null,
+						"decimals": null,
+						"values": null,
+						"allow_null": true,
+						"default": null,
+						"comment": "",
+						"unsigned": true,
+						"auto_increment": false
+					},
+					"stat_title": {
+						"name": "stat_title",
+						"type": "TINYTEXT",
+						"length": null,
+						"decimals": null,
+						"values": null,
+						"allow_null": false,
+						"default": null,
+						"comment": "The title of the stat to display in the report",
+						"unsigned": false,
+						"auto_increment": false
+					},
+					"stat_member": {
+						"name": "stat_member",
+						"type": "BIGINT",
+						"length": null,
+						"decimals": null,
+						"values": null,
+						"allow_null": true,
+						"default": null,
+						"comment": "",
+						"unsigned": true,
+						"auto_increment": false
+					}
+				},
+				"indexes": {
+					"PRIMARY": {
+						"type": "primary",
+						"name": "PRIMARY",
+						"columns": [
+							"id"
+						],
+						"length": [
+							null
+						]
+					}
+				}
+			}
+		]
+	},
+	"2": {
+		"method": "createTable",
+		"params": [
+			{
+				"name": "core_reports",
+				"columns": {
+					"id": {
+						"name": "id",
+						"type": "BIGINT",
+						"length": "20",
+						"unsigned": true,
+						"allow_null": false,
+						"default": null,
+						"auto_increment": true,
+						"comment": "ID Number"
+					},
+					"report_title": {
+						"name": "report_title",
+						"type": "VARCHAR",
+						"length": 1024,
+						"decimals": null,
+						"values": null,
+						"allow_null": false,
+						"default": null,
+						"comment": "",
+						"unsigned": false,
+						"auto_increment": false
+					},
+					"report_range_start": {
+						"name": "report_range_start",
+						"type": "INT",
+						"length": null,
+						"decimals": null,
+						"values": null,
+						"allow_null": true,
+						"default": null,
+						"comment": "",
+						"unsigned": true,
+						"auto_increment": false
+					},
+					"report_range_end": {
+						"name": "report_range_end",
+						"type": "INT",
+						"length": null,
+						"decimals": null,
+						"values": null,
+						"allow_null": true,
+						"default": null,
+						"comment": "",
+						"unsigned": true,
+						"auto_increment": false
+					},
+					"report_range_timescale": {
+						"name": "report_range_timescale",
+						"type": "INT",
+						"length": null,
+						"decimals": null,
+						"values": null,
+						"allow_null": true,
+						"default": null,
+						"comment": "The timescale - e.g. weeks: 7, months: 30, etc",
+						"unsigned": false,
+						"auto_increment": false
+					}
+				},
+				"indexes": {
+					"PRIMARY": {
+						"type": "primary",
+						"name": "PRIMARY",
+						"columns": [
+							"id"
+						],
+						"length": [
+							null
+						]
+					},
+					"unique_names": {
+						"type": "unique",
+						"name": "unique_names",
+						"columns": [
+							"report_title"
+						],
+						"length": [
+							250
+						]
+					}
+				}
+			}
+		]
+	},
+	"3": {
+		"method": "addColumn",
+		"params": [
+			"core_saved_charts",
+			{
+				"name": "chart_report_id",
+				"type": "BIGINT",
+				"length": null,
+				"decimals": null,
+				"values": null,
+				"allow_null": true,
+				"default": null,
+				"comment": "",
+				"unsigned": true,
+				"auto_increment": false
+			}
+		]
+	}
+}

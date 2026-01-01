@@ -1,0 +1,14 @@
+{
+    "normal": {
+        "added": [
+            "login_method_cannot_edit_managed"
+        ],
+        "edited": [],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

@@ -1,0 +1,19 @@
+{
+    "normal": {
+        "added": [
+            "sf_type_UserPass",
+            "sf_type_Ftp",
+            "sf_validate_ftp",
+            "sf_validate_ftp_desc",
+            "sf_validate_ftp_noftp",
+            "sf_validate_ftp_nosftp"
+        ],
+        "edited": [],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

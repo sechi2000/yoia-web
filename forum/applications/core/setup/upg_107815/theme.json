@@ -1,0 +1,27 @@
+{
+    "html": {
+        "added": [
+            "global\/forms\/captchaTurnstile"
+        ],
+        "edited": [
+            "admin\/system\/upgradeDeltaLargeTables",
+            "admin\/system\/upgradeDeltaResourceIssues",
+            "admin\/system\/upgradeDeltaThemeConflicts"
+        ],
+        "removed": [
+            "admin\/support\/fixMd5",
+            "admin\/support\/fixMd5Download",
+            "admin\/system\/upgradeDeltaMd5"
+        ]
+    },
+    "css": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

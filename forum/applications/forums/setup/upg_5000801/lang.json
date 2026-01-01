@@ -1,0 +1,17 @@
+{
+    "normal": {
+        "added": [
+            "__defart_nodegroup__forums_pl",
+            "__defart_nodegroup__forums",
+            "forums_solved_nudge_experts_prefix",
+            "forums_solved_nudge_experts_suffix"
+        ],
+        "edited": [],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

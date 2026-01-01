@@ -1,0 +1,23 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/browse\/indexButtons",
+            "front\/global\/categoryLink",
+            "front\/view\/blogTable",
+            "front\/view\/view",
+            "front\/widgets\/blogCommentFeed"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

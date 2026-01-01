@@ -1,0 +1,17 @@
+{
+    "normal": {
+        "added": [
+            "perm_cfield_perm__view",
+            "perm_cfield_perm__edit",
+            "perm_cfield_perm__add",
+            "perm_cfield_perm__label"
+        ],
+        "edited": [],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

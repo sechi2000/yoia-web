@@ -1,0 +1,30 @@
+{
+    "files": {
+        "added": [],
+        "edited": [
+            "global\/framework\/common\/ips.loader.js",
+            "global\/framework\/common\/ui\/ips.ui.codebox.js",
+            "global\/framework\/common\/ui\/ips.ui.codehighlighting.js",
+            "global\/framework\/common\/ui\/ips.ui.copy.js",
+            "global\/framework\/common\/ui\/ips.ui.editorv5.js",
+            "global\/framework\/common\/ui\/ips.ui.form.js",
+            "global\/framework\/common\/utils\/ips.utils.color.js",
+            "global\/framework\/common\/utils\/ips.utils.iconpicker.js",
+            "global\/framework\/common\/utils\/ips.utils.pagebuildericons.js",
+            "global\/front\/controllers\/core\/ips.core.commentFeed.js",
+            "core\/global\/controllers\/core\/ips.core.cropper.js",
+            "core\/front\/controllers\/system\/ips.system.manageFollowed.js",
+            "core\/front\/controllers\/system\/ips.system.referrals.js",
+            "core\/admin\/controllers\/templates\/ips.templates.simple.js",
+            "core\/front\/controllers\/widgets\/ips.widgets.manager.js",
+            "global\/framework\/templates\/ips.core.templates.js",
+            "core\/front\/templates\/ips.templates.system.js"
+        ],
+        "removed": []
+    },
+    "orders": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

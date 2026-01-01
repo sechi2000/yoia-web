@@ -1,0 +1,17 @@
+{
+    "normal": {
+        "added": [
+            "tag_recommended",
+            "tag_recommended_desc",
+            "tag_mark_recommend",
+            "tag_mark_norecommend"
+        ],
+        "edited": [],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

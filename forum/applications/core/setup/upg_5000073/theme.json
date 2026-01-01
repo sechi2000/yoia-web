@@ -1,0 +1,25 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "global\/global\/includeCSS",
+            "global\/global\/includeJS"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "global\/framework\/1-3-variables.css",
+            "global\/framework\/3-data-tables.css",
+            "global\/framework\/3-editor.css",
+            "global\/framework\/3-post-content.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

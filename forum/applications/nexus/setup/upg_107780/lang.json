@@ -1,0 +1,17 @@
+{
+    "normal": {
+        "added": [
+            "currency_code_lang_missing",
+            "currency_code_multiple_default"
+        ],
+        "edited": [
+            "stripe_webhook_blurb"
+        ],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

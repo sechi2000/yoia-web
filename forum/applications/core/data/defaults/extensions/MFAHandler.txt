@@ -1,0 +1,146 @@
+<?php
+/**
+ * @brief		MFA Handler Extension
+ * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
+ * @copyright	(c) Invision Power Services, Inc.
+ * @license		https://www.invisioncommunity.com/legal/standards/
+{subpackage}
+ * @since		{date}
+ */
+
+namespace IPS\{app}\extensions\core\MFAHandler;
+
+/* To prevent PHP errors (extending class does not exist) revealing path */
+
+use IPS\Http\Url;
+use IPS\Member;
+use IPS\MFA\MFAHandler;
+use function defined;
+
+if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+{
+	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	exit;
+}
+
+/**
+ * MFAHandler Extension
+ */
+class {class} extends MFAHandler
+{	
+	/**
+	 * @brief	Key
+	 */
+	public static string $key = '{key}';
+
+	/**
+	 * Handler is enabled
+	 *
+	 * @return    bool
+	 */
+	public function isEnabled(): bool
+	{
+		return true;
+	}
+
+	/**
+	 * Member *can* use this handler (even if they have not yet configured it)
+	 *
+	 * @param Member $member The member
+	 * @return    bool
+	 */
+	public function memberCanUseHandler( Member $member ): bool
+	{
+		return true;
+	}
+
+	/**
+	 * Member has configured this handler
+	 *
+	 * @param Member $member The member
+	 * @return    bool
+	 */
+	public function memberHasConfiguredHandler( Member $member ): bool
+	{
+		return false;
+	}
+
+	/**
+	 * Show a setup screen
+	 *
+	 * @param Member $member The member
+	 * @param bool $showingMultipleHandlers Set to TRUE if multiple options are being displayed
+	 * @param Url $url URL for page
+	 * @return    string
+	 */
+	public function configurationScreen( Member $member, bool $showingMultipleHandlers, Url $url ): string
+	{
+		return '';
+	}
+
+	/**
+	 * Submit configuration screen. Return TRUE if was accepted
+	 *
+	 * @param Member $member The member
+	 * @return    bool
+	 */
+	public function configurationScreenSubmit( Member $member ): bool
+	{
+		return false;
+	}
+
+	/**
+	 * Get the form for a member to authenticate
+	 *
+	 * @param Member $member The member
+	 * @param Url $url URL for page
+	 * @return    string
+	 */
+	public function authenticationScreen( Member $member, Url $url ): string
+	{
+		return '';
+	}
+
+	/**
+	 * Submit authentication screen. Return TRUE if was accepted
+	 *
+	 * @param Member $member The member
+	 * @return    bool
+	 */
+	public function authenticationScreenSubmit( Member $member ): bool
+	{
+		return false;
+	}
+
+	/**
+	 * Toggle
+	 *
+	 * @param bool $enabled On/Off
+	 * @return    void
+	 */
+	public function toggle( bool $enabled ): void
+	{
+
+	}
+
+	/**
+	 * ACP Settings
+	 *
+	 * @return    string
+	 */
+	public function acpSettings(): string
+	{
+		return '';
+	}
+
+	/**
+	 * If member has configured this handler, disable it
+	 *
+	 * @param Member $member The member
+	 * @return    void
+	 */
+	public function disableHandlerForMember( Member $member ): void
+	{
+
+	}
+}

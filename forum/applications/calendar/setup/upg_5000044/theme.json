@@ -1,0 +1,21 @@
+{
+    "html": {
+        "added": [
+            "front\/view\/eventHovercard"
+        ],
+        "edited": [
+            "front\/view\/eventBlock"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

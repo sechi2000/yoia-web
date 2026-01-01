@@ -1,0 +1,16 @@
+{
+    "normal": {
+        "added": [
+            "cal_allow_recurring",
+            "cal_show_overview",
+            "cal_show_overview_desc"
+        ],
+        "edited": [],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

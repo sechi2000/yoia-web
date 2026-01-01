@@ -1,0 +1,19 @@
+{
+    "1": {
+        "method": "insert",
+        "params": [
+            "core_permission_index",
+            {
+                "app": "gallery",
+                "perm_type": "category",
+                "perm_type_id": 1,
+                "perm_view": "*",
+                "perm_2": "*",
+                "perm_3": "<%NO_GUESTS%>",
+                "perm_4": "<%NO_GUESTS%>",
+                "perm_5": "<%NO_GUESTS%>",
+                "perm_6": "<%NO_GUESTS%>"
+            }
+        ]
+    }
+}

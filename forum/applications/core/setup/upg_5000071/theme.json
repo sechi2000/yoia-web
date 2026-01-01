@@ -1,0 +1,27 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/global\/globalTemplate",
+            "global\/global\/includeJS",
+            "front\/global\/uploadedIcon"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "global\/framework\/1-4-colors.css",
+            "global\/framework\/3-data-tables.css",
+            "global\/framework\/3-inputs.css",
+            "global\/framework\/3-social-icons.css",
+            "global\/framework\/4-footer.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

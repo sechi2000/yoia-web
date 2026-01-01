@@ -1,0 +1,19 @@
+{
+    "normal": {
+        "added": [
+            "rsvp_selection_leave"
+        ],
+        "edited": [
+            "rsvp_notgoing_event",
+            "rsvp_download"
+        ],
+        "removed": [
+            "rsvp_change"
+        ]
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

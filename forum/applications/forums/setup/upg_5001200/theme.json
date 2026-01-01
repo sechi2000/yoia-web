@@ -1,0 +1,27 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/forums\/forumTable",
+            "front\/global\/row",
+            "front\/index\/simplifiedForumTable",
+            "front\/topics\/post",
+            "front\/topics\/postContainer",
+            "front\/topics\/postHeader",
+            "front\/topics\/topic"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "front\/topics.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

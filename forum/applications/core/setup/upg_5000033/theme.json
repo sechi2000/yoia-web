@@ -1,0 +1,75 @@
+{
+    "html": {
+        "added": [
+            "front\/global\/miniProfileWrap"
+        ],
+        "edited": [
+            "front\/embed\/embedOriginalItem",
+            "global\/forms\/editorAttachmentsPlaceholder",
+            "front\/global\/comment",
+            "front\/global\/includeDataLayer",
+            "front\/global\/miniProfile",
+            "front\/global\/review",
+            "admin\/memberprofile\/warnings",
+            "front\/modcp\/alertRow",
+            "front\/modcp\/announcementRow",
+            "front\/modcp\/report",
+            "front\/modcp\/reportPanel",
+            "front\/profile\/allFollowers",
+            "front\/profile\/followers",
+            "front\/profile\/profile",
+            "front\/profile\/profileHeader",
+            "front\/profile\/recentVisitorsBlock",
+            "front\/profile\/tableRow",
+            "front\/profile\/userBadgeOverview",
+            "front\/profile\/userContent",
+            "front\/profile\/userReputation",
+            "front\/profile\/userSolutions",
+            "front\/system\/followedContentMemberRow",
+            "front\/tables\/manageFollowRow",
+            "front\/tables\/rows",
+            "front\/tables\/table",
+            "front\/tags\/contentTableRows",
+            "front\/widgets\/relatedContent"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "global\/framework\/3-cover-photo.css",
+            "global\/framework\/3-entries.css",
+            "global\/framework\/3-misc.css",
+            "global\/framework\/3-richtext.css",
+            "global\/framework\/3-streams.css",
+            "front\/styles\/profiles.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": [
+            "admin\/mobileapp\/screenshot.png",
+            "admin\/large_loading.gif",
+            "admin\/loading.gif",
+            "admin\/small_loading.gif",
+            "admin\/notepad_bg.png",
+            "front\/wizard_step_extra@2x.png",
+            "front\/wizard_step_extra_rtl@2x.png",
+            "front\/wizard_step_large_rtl.png",
+            "front\/wizard_step_extra.png",
+            "front\/wizard_step_large_rtl@2x.png",
+            "front\/notification_settings\/email.svg",
+            "front\/notification_settings\/push.svg",
+            "front\/notification_settings\/notification_bell.svg",
+            "front\/hive\/communityhive.svg",
+            "front\/hive\/logo_on_white_background.png",
+            "front\/wizard_step_large@2x.png",
+            "front\/wizard_step_large.png",
+            "front\/loaders\/large_loading@2x.gif",
+            "front\/loaders\/large_loading.gif",
+            "front\/wizard_step_extra_rtl.png"
+        ]
+    }
+}

@@ -1,0 +1,21 @@
+{
+  "1": {
+    "method": "changeColumn",
+    "params": [
+      "core_validating",
+      "prev_email",
+      {
+        "name": "new_email",
+        "type": "VARCHAR",
+        "length": 150,
+        "decimals": null,
+        "values": [],
+        "allow_null": false,
+        "default": "0",
+        "comment": "",
+        "unsigned": false,
+        "auto_increment": false
+      }
+    ]
+  }
+}

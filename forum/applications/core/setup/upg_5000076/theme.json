@@ -1,0 +1,22 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/clubs\/clubCard",
+            "front\/clubs\/clubRow",
+            "front\/clubs\/coverPhotoOverlay",
+            "front\/clubs\/header"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

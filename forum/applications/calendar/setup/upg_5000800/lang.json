@@ -1,0 +1,20 @@
+{
+    "normal": {
+        "added": [
+            "submit_event_start_date",
+            "submit_event_start_time",
+            "submit_event_end_date",
+            "submit_event_end_time"
+        ],
+        "edited": [],
+        "removed": [
+            "submit_event_start",
+            "submit_event_end"
+        ]
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

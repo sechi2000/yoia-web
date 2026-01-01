@@ -1,0 +1,24 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "admin\/customization\/themeDescription"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "global\/framework\/3-data-tables.css",
+            "global\/framework\/3-misc.css",
+            "global\/framework\/4-header.css",
+            "global\/framework\/4-mobile-footer.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

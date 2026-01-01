@@ -1,0 +1,19 @@
+{
+    "files": {
+        "added": [],
+        "edited": [
+            "global\/library\/app.js",
+            "global\/framework\/common\/ips.loader.js",
+            "global\/framework\/common\/utils\/ips.utils.url.js",
+            "global\/front\/controllers\/core\/ips.core.comment.js",
+            "global\/front\/controllers\/core\/ips.core.commentFeed.js",
+            "global\/front\/controllers\/core\/ips.core.reaction.js"
+        ],
+        "removed": []
+    },
+    "orders": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

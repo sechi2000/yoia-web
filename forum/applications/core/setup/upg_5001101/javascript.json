@@ -1,0 +1,24 @@
+{
+    "files": {
+        "added": [
+            "global\/framework\/common\/components\/pullToRefresh.js"
+        ],
+        "edited": [
+            "global\/library\/app.js",
+            "global\/framework\/common\/ui\/ips.ui.editorv5.js",
+            "global\/framework\/common\/ui\/ips.ui.form.js",
+            "global\/framework\/common\/ui\/ips.ui.sideMenu.js",
+            "global\/admin\/controllers\/core\/ips.core.editorRestrictions.js",
+            "core\/front\/controllers\/search\/ips.search.filters.js",
+            "core\/front\/controllers\/widgets\/ips.widgets.manager.js"
+        ],
+        "removed": [
+            "global\/framework\/common\/components\/pulltorefresh.js"
+        ]
+    },
+    "orders": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

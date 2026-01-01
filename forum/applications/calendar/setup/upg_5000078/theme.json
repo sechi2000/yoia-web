@@ -1,0 +1,23 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/view\/coverPhotoOverlay",
+            "front\/view\/eventSidebar",
+            "front\/view\/reminderButton",
+            "front\/view\/rsvpControls",
+            "front\/view\/view"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

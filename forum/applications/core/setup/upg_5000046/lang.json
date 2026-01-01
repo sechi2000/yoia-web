@@ -1,0 +1,18 @@
+{
+    "normal": {
+        "added": [
+            "theme_not_valid_badge",
+            "theme_not_valid"
+        ],
+        "edited": [],
+        "removed": [
+            "ad_promo_title",
+            "ad_promo_msg"
+        ]
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

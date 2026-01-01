@@ -1,0 +1,29 @@
+{
+    "normal": {
+        "added": [
+            "acp_switch_to_cloud",
+            "acp_switch_to_cloud_hide",
+            "prune_known_ips_desc"
+        ],
+        "edited": [],
+        "removed": [
+            "download_upgrade_initial_theme_conflicts_title",
+            "download_upgrade_initial_theme_conflicts_explain",
+            "download_upgrade_initial_theme_conflicts_tip"
+        ]
+    },
+    "js": {
+        "added": [
+            "editor_node--paragraph",
+            "editor_node--heading_1",
+            "editor_node--heading_2",
+            "editor_node--heading_3",
+            "editor_node--heading_4",
+            "editor_node--heading_5",
+            "editor_node--heading_6",
+            "editor_node--code_block"
+        ],
+        "edited": [],
+        "removed": []
+    }
+}

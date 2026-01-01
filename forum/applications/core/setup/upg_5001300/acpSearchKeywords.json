@@ -1,0 +1,15 @@
+{
+    "added": [
+        "app=core&module=settings&controller=login&tab=registration&searchResult=reg_welcome_email"
+    ],
+    "edited": [
+        "app=core&module=promotion&controller=seo",
+        "app=core&module=promotion&controller=seo&tab=metatags",
+        "app=core&module=promotion&controller=seo&tab=robotstxt",
+        "app=core&module=promotion&controller=seo&tab=robotstxt&searchResult=use_robotstxt",
+        "app=core&module=promotion&controller=seo&tab=sitemap",
+        "app=core&module=promotion&controller=seo&tab=urls",
+        "app=core&module=stats&controller=referrals"
+    ],
+    "removed": []
+}

@@ -1,0 +1,20 @@
+{
+    "normal": {
+        "added": [
+            "templates_css",
+            "templates_js",
+            "cms_import_wrappers",
+            "cms_template_no_import",
+            "content_import_dev_templates_info",
+            "content_import_db",
+            "content_import_wrappers"
+        ],
+        "edited": [],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

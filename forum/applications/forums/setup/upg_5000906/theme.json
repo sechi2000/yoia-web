@@ -1,0 +1,22 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/submit\/createTopicForm",
+            "front\/submit\/createTopicModOptions",
+            "front\/widgets\/postFeed",
+            "front\/widgets\/topicFeedRow"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

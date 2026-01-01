@@ -1,0 +1,19 @@
+{
+    "normal": {
+        "added": [
+            "gallery_metadata_none",
+            "gallery_metadata_sensitive",
+            "gallery_metadata_sensitive_desc",
+            "gallery_metadata_all",
+            "gallery_metadata_desc_gd",
+            "gallery_metadata_desc_imagick"
+        ],
+        "edited": [],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

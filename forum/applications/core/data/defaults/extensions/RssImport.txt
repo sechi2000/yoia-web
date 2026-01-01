@@ -1,0 +1,89 @@
+<?php
+/**
+ * @brief		RSS Import extension: {class}
+ * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
+ * @copyright	(c) Invision Power Services, Inc.
+ * @license		https://www.invisioncommunity.com/legal/standards/
+ * @package		Invision Community
+{subpackage}
+ * @since		{date}
+ */
+
+namespace IPS\{app}\extensions\core\RssImport;
+
+use IPS\Content;
+use IPS\core\Rss\Import;
+use IPS\Extensions\RssImportAbstract;
+use IPS\Helpers\Form;
+use IPS\Node\Model;
+use function defined;
+
+/* To prevent PHP errors (extending class does not exist) revealing path */
+if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+{
+	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	exit;
+}
+
+/**
+ * @brief	RSS Import extension: {class}
+ */
+class {class} extends RssImportAbstract
+{
+	/**
+	 * Constructor
+	 *
+	 * @return	void
+	 */
+	public function __construct()
+	{
+		$this->classes[] = '{item}';
+	}
+
+	/**
+	 * Node selector options
+	 *
+	 * @param Import|null $rss	Existing RSS object if editing|null if not
+	 * @return array
+	 */
+	public function nodeSelectorOptions( ?Import $rss ): array
+	{
+		return array();
+	}
+
+	/**
+	 * Display Form
+	 *
+	 * @param	Form		$form	The form
+	 * @param Import|null $rss	Existing RSS object if editing|null if not
+	 * @return	void
+	 */
+	public function form( Form $form, ?Import $rss=null ) : void
+	{		
+		$form->add( new \IPS\Helpers\Form\Text( 'example' ) );
+	}
+	
+	/**
+	 * Save
+	 *
+	 * @param	array				$values	Values from form
+	 * @param Import $rss	Existing RSS object
+	 * @return	array
+	 */
+	public function saveForm( array &$values, Import $rss ) : array
+	{
+		return $values;
+	}
+
+	/**
+	 * @param Import 	$rss 		RSS object
+	 * @param array 				$article 	RSS feed article importing
+	 * @param Model 		$container  Container object
+	 * @param	string				$content	Post content with read more link if set
+	 * @return Content|null
+	 */
+	public function create( Import $rss, array $article, Model $container, string $content ): ?Content
+	{
+		return null;
+	}
+}

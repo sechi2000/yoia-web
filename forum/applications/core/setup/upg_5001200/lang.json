@@ -1,0 +1,34 @@
+{
+    "normal": {
+        "added": [
+            "queue_cleanup_approval_queue",
+            "clubs_sort_distance",
+            "club_filter_location",
+            "club_auto_follow",
+            "club_auto_follow_desc",
+            "club_auto_follow_desc_edit",
+            "queue_club_auto_follow",
+            "app_desc_confirm",
+            "tag_text_desc",
+            "tags_search_desc"
+        ],
+        "edited": [
+            "notification_options",
+            "promote_toggle_custom_desc",
+            "promote_toggle_comment_desc",
+            "dev_app_missing_description"
+        ],
+        "removed": [
+            "replied_lc",
+            "mailsub__core_acp_notification_ManualInterventionMessage",
+            "method_check_fail",
+            "acp_notification_ManualInterventionMessage",
+            "advise_removal_of_php8_incompatible_code"
+        ]
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

@@ -1,0 +1,20 @@
+{
+    "normal": {
+        "added": [
+            "ext__Software",
+            "ext__Library"
+        ],
+        "edited": [],
+        "removed": [
+            "new_software",
+            "classname",
+            "classname_desc",
+            "new_software_not_in_dev"
+        ]
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

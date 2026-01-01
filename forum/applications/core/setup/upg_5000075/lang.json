@@ -1,0 +1,18 @@
+{
+    "normal": {
+        "added": [
+            "g_icon_width",
+            "g_icon_width_desc",
+            "__default_tab_settings"
+        ],
+        "edited": [
+            "ext__Permissions"
+        ],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

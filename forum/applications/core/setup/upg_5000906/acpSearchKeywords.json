@@ -1,0 +1,16 @@
+{
+    "added": [
+        "app=core&module=clubs&controller=templates",
+        "app=core&module=moderation&controller=report",
+        "app=core&module=overview&controller=mycharts&do=communityhealth"
+    ],
+    "edited": [
+        "app=core&module=activitystats&controller=overview",
+        "app=core&module=applications&controller=enhancements",
+        "app=core&module=applications&controller=enhancements&do=edit&id=core_Postmark",
+        "app=core&module=moderation&controller=reportedContentTypes"
+    ],
+    "removed": [
+        "app=core&module=settings&controller=webapp&searchResult=manifest_display"
+    ]
+}

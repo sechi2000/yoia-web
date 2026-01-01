@@ -1,0 +1,11 @@
+{
+    "added": [
+        "loginAfterInactivity"
+    ],
+    "edited": [
+        "registration_validate",
+        "email_change",
+        "emailWrapper"
+    ],
+    "removed": []
+}

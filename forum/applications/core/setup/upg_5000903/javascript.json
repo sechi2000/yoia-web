@@ -1,0 +1,16 @@
+{
+    "files": {
+        "added": [],
+        "edited": [
+            "global\/library\/app.js",
+            "core\/admin\/controllers\/stats\/ips.stats.downloadbutton.js",
+            "core\/admin\/controllers\/stats\/ips.stats.overviewBlock.mixin.js"
+        ],
+        "removed": []
+    },
+    "orders": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

@@ -1,0 +1,56 @@
+<?php
+/**
+ * @brief		{class}
+ * @author		<a href='https://www.invisioncommunity.com'>Invision Power Services, Inc.</a>
+ * @copyright	(c) Invision Power Services, Inc.
+ * @license		https://www.invisioncommunity.com/legal/standards/
+ * @package		Invision Community
+{subpackage}
+ * @since		{date}
+ */
+
+namespace IPS\{app}\extensions\core\EmailHandler;
+
+use Exception;
+use IPS\Email;
+
+/* To prevent PHP errors (extending class does not exist) revealing path */
+if ( !defined( '\IPS\SUITE_UNIQUE_KEY' ) )
+{
+	header( ( $_SERVER['SERVER_PROTOCOL'] ?? 'HTTP/1.0' ) . ' 403 Forbidden' );
+	exit;
+}
+
+/**
+ * {class}
+ */
+class {class} extends Email
+{
+	/**
+	 * Send the email
+	 *
+	 * @param	mixed	$to					The member or email address, or array of members or email addresses, to send to
+	 * @param mixed $cc					Addresses to CC (can also be email, member or array of either)
+	 * @param mixed $bcc				Addresses to BCC (can also be email, member or array of either)
+	 * @param mixed $fromEmail			The email address to send from. If NULL, default setting is used
+	 * @param mixed $fromName			The name the email should appear from. If NULL, default setting is used
+	 * @param array $additionalHeaders	The name the email should appear from. If NULL, default setting is used
+	 * @return	void
+	 * @throws   Exception
+	 */
+	public function _send( mixed $to, mixed $cc=array(), mixed $bcc=array(), mixed $fromEmail = NULL, mixed $fromName = NULL, array $additionalHeaders = array() ) : void
+	{
+
+	}
+
+	/**
+	 * Is Outgoing Handler usable?
+	 *
+	 * @param string $type Email type
+	 * @return bool
+	 */
+	public static function isUsable( string $type ): bool
+	{
+		return false;
+	}
+}

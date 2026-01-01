@@ -1,0 +1,34 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/browse\/album",
+            "front\/browse\/albumComments",
+            "front\/browse\/albumReviews",
+            "front\/browse\/categoryCarousel",
+            "front\/browse\/categoryGrid",
+            "front\/browse\/categoryRow",
+            "front\/browse\/index",
+            "front\/forms\/reviewTemplate",
+            "front\/global\/comment",
+            "front\/global\/review",
+            "admin\/stats\/uploadersTable",
+            "front\/view\/comments",
+            "front\/view\/imageFrame",
+            "front\/view\/imageInfo",
+            "front\/view\/imageLightboxFrame",
+            "front\/view\/reviews"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

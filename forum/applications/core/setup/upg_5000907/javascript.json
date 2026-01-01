@@ -1,0 +1,16 @@
+{
+    "files": {
+        "added": [
+            "global\/framework\/common\/components\/pullToRefresh.js"
+        ],
+        "edited": [],
+        "removed": [
+            "global\/framework\/common\/components\/pulltorefresh.js"
+        ]
+    },
+    "orders": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

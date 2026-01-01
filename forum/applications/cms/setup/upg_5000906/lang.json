@@ -1,0 +1,25 @@
+{
+    "normal": {
+        "added": [
+            "content_page_history",
+            "revision_date",
+            "revision_member_id",
+            "view_page_revision",
+            "revision_page_manual",
+            "revision_manual_save",
+            "revision_page_type_manual",
+            "revision_page_type_auto",
+            "revision_page_last_session",
+            "viewing_page_revision",
+            "page_version_use",
+            "follow_button_notification_settings"
+        ],
+        "edited": [],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

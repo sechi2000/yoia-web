@@ -1,0 +1,62 @@
+{
+    "1": {
+        "method": "addColumn",
+        "params": [
+            "core_rc_reports",
+            {
+                "name": "guest_name",
+                "type": "VARCHAR",
+                "length": 255,
+                "decimals": null,
+                "values": null,
+                "allow_null": true,
+                "default": null,
+                "comment": "",
+                "unsigned": false,
+                "auto_increment": false
+            }
+        ]
+    },
+    "2": {
+        "method": "addColumn",
+        "params": [
+            "core_rc_reports",
+            {
+                "name": "guest_email",
+                "type": "VARCHAR",
+                "length": 255,
+                "decimals": null,
+                "values": null,
+                "allow_null": true,
+                "default": null,
+                "comment": "",
+                "unsigned": false,
+                "auto_increment": false
+            }
+        ]
+    },
+    "3": {
+        "method": "changeColumn",
+        "params": [
+            "core_rc_index",
+            "status",
+            {
+                "name": "status",
+                "type": "ENUM",
+                "length": 0,
+                "decimals": null,
+                "values": [
+                    "1",
+                    "2",
+                    "3",
+                    "4"
+                ],
+                "allow_null": false,
+                "default": "1",
+                "comment": "1 = New report. 2 = Under Review. 3 = Complete. 4 = Closed.",
+                "unsigned": false,
+                "auto_increment": false
+            }
+        ]
+    }
+}

@@ -1,0 +1,28 @@
+{
+    "normal": {
+        "added": [
+            "filehandler__Backblaze",
+            "filehandler__Backblaze_desc",
+            "filehandler__Backblaze_bucket",
+            "filehandler__Backblaze_bucket_desc",
+            "filehandler__Backblaze_endpoint",
+            "filehandler__Backblaze_endpoint_desc",
+            "filehandler__Backblaze_bucket_path",
+            "filehandler__Backblaze_bucket_path_desc",
+            "filehandler__Backblaze_access_key",
+            "filehandler__Backblaze_access_key_desc",
+            "filehandler__Backblaze_secret_key",
+            "filehandler__Backblaze_toggle",
+            "filehandler__Backblaze_toggle_desc",
+            "filehandler__Backblaze_custom_url",
+            "dev_widget_menu_style_desc"
+        ],
+        "edited": [],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

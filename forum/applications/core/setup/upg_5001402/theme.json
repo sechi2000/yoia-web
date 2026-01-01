@@ -1,0 +1,20 @@
+{
+    "html": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "global\/framework\/3-dropdown.css",
+            "global\/framework\/3-popup.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

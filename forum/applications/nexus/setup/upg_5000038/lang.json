@@ -1,0 +1,16 @@
+{
+    "normal": {
+        "added": [
+            "package_cannot_reactivate_error"
+        ],
+        "edited": [
+            "stripe_webhook_blurb"
+        ],
+        "removed": []
+    },
+    "js": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

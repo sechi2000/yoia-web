@@ -1,0 +1,20 @@
+{
+    "added": [
+        "app=core&module=settings&controller=login&tab=settings&searchResult=form_login_after_inactivity_notification",
+        "app=core&module=settings&controller=posting&tab=simplifiedMode&searchResult=form_editor_r__table"
+    ],
+    "edited": [
+        "app=core&module=applications&controller=enhancements",
+        "app=core&module=applications&controller=menu",
+        "app=core&module=discovery&controller=streams&do=allActivitySettings",
+        "app=core&module=members&controller=groups&searchResult=g_rep_max_positive",
+        "app=core&module=moderation&controller=spam",
+        "app=core&module=overview&controller=mycharts",
+        "app=core&module=promotion&controller=sharelinks",
+        "app=core&module=settings&controller=general&searchResult=form_site_social_profiles",
+        "app=core&module=settings&controller=posting"
+    ],
+    "removed": [
+        "app=core&module=moderation&controller=spam&searchResult=guest_captcha"
+    ]
+}

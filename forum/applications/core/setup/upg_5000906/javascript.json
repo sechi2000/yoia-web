@@ -1,0 +1,40 @@
+{
+    "files": {
+        "added": [
+            "global\/framework\/common\/components\/card.js",
+            "global\/framework\/common\/components\/dropdown.js",
+            "global\/framework\/common\/components\/pulltorefresh.js",
+            "global\/framework\/common\/components\/pushNotificationsPrompt.js",
+            "global\/framework\/common\/components\/pwaInstall.js",
+            "global\/framework\/common\/components\/pwaLoading.js",
+            "global\/framework\/common\/components\/themeEditor.js",
+            "global\/framework\/common\/ui\/ips.ui.pullToRefresh.js",
+            "global\/framework\/common\/ui\/ips.ui.pwaLoading.js",
+            "global\/framework\/common\/ui\/ips.ui.webcomponents.js",
+            "core\/front\/controllers\/core\/ips.core.notificationsMenu.js"
+        ],
+        "edited": [
+            "global\/library\/app.js",
+            "global\/framework\/common\/ui\/ips.ui.autocomplete.js",
+            "global\/framework\/common\/ui\/ips.ui.form.js",
+            "global\/framework\/common\/ui\/ips.ui.js",
+            "global\/framework\/common\/utils\/ips.utils.db.js",
+            "global\/framework\/common\/utils\/ips.utils.notification.js",
+            "core\/front\/controllers\/clubs\/ips.clubs.navbar.js",
+            "global\/front\/controllers\/core\/ips.core.app.js",
+            "core\/front\/controllers\/core\/ips.core.followForm.js",
+            "global\/front\/controllers\/core\/ips.core.userbar.js",
+            "core\/global\/controllers\/customization\/ips.customization.visualLang.js",
+            "core\/front\/controllers\/modcp\/ips.modcp.reportToggle.js",
+            "core\/front\/controllers\/system\/ips.system.notificationSettings.js",
+            "core\/front\/controllers\/widgets\/ips.widgets.manager.js",
+            "global\/framework\/templates\/ips.core.templates.js"
+        ],
+        "removed": []
+    },
+    "orders": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

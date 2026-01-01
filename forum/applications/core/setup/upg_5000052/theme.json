@@ -1,0 +1,41 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "admin\/api\/oauthSecret",
+            "admin\/global\/globalTemplate",
+            "front\/global\/loginPopup",
+            "front\/global\/mobileFooterBar",
+            "front\/global\/queryLog",
+            "front\/global\/userBar",
+            "front\/messaging\/template",
+            "front\/modcp\/hiddenTableWrapper",
+            "front\/widgets\/blockList",
+            "front\/widgets\/builderWrapper"
+        ],
+        "removed": [
+            "admin\/system\/upgradeDeltaThemeConflicts"
+        ]
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "admin\/core\/global.css",
+            "global\/framework\/1-3-variables.css",
+            "global\/framework\/3-boxes.css",
+            "global\/framework\/3-carousel.css",
+            "global\/framework\/3-data-tables.css",
+            "global\/framework\/3-editor.css",
+            "global\/framework\/3-forms.css",
+            "global\/framework\/3-images.css",
+            "global\/framework\/3-richtext.css",
+            "front\/styles\/query_log.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

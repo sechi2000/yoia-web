@@ -1,0 +1,31 @@
+{
+    "normal": {
+        "added": [
+            "author_stats_cannot_load",
+            "ipb_embed_url_whitelist_desc",
+            "menu_title_node_type",
+            "menu_title_node_inherit",
+            "menu_title_node_custom",
+            "menu_title_node"
+        ],
+        "edited": [
+            "front_logged_in_as",
+            "solutionlog_show_activity",
+            "ipb_embed_url_whitelist",
+            "profile_you_won",
+            "profile_member_won",
+            "profile_you_congrats"
+        ],
+        "removed": [
+            "byline_itemprop",
+            "ipb__embed_url_whitelist_desc"
+        ]
+    },
+    "js": {
+        "added": [
+            "ips.ui.controls.cannot_load"
+        ],
+        "edited": [],
+        "removed": []
+    }
+}

@@ -1,0 +1,21 @@
+{
+    "files": {
+        "added": [],
+        "edited": [
+            "global\/framework\/common\/ui\/ips.ui.form.js",
+            "global\/framework\/common\/ui\/ips.ui.tableOfContents.js",
+            "global\/framework\/common\/ui\/ips.ui.tooltip.js",
+            "core\/admin\/controllers\/badgepreview\/ips.core.badgepreview.js",
+            "core\/admin\/controllers\/core\/ips.core.langString.js",
+            "global\/admin\/templates\/ips.core.templates.js"
+        ],
+        "removed": [
+            "core\/admin\/controllers\/system\/ips.system.langString.js"
+        ]
+    },
+    "orders": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

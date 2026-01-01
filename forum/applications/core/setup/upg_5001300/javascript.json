@@ -1,0 +1,35 @@
+{
+    "files": {
+        "added": [],
+        "edited": [
+            "global\/library\/app.js",
+            "global\/framework\/common\/components\/dropdown.js",
+            "global\/framework\/common\/ui\/ips.ui.alert.js",
+            "global\/framework\/common\/ui\/ips.ui.codebox.js",
+            "global\/framework\/common\/ui\/ips.ui.dialog.js",
+            "global\/framework\/common\/ui\/ips.ui.form.js",
+            "global\/framework\/common\/ui\/ips.ui.js",
+            "global\/framework\/common\/ui\/ips.ui.selectTree.js",
+            "global\/front\/controllers\/core\/ips.core.comment.js",
+            "global\/front\/controllers\/core\/ips.core.commentFeed.js",
+            "core\/front\/controllers\/core\/ips.core.dataLayer.js",
+            "core\/front\/controllers\/core\/ips.core.followButton.js",
+            "global\/front\/controllers\/core\/ips.core.lightboxedImages.js",
+            "core\/global\/controllers\/core\/ips.core.coverPhoto.js",
+            "core\/global\/controllers\/core\/ips.core.licenseRenewal.js",
+            "core\/front\/controllers\/modcp\/ips.modcp.warnForm.js",
+            "core\/admin\/controllers\/stats\/ips.stats.overview.js",
+            "core\/admin\/controllers\/stats\/ips.stats.overviewBlock.js",
+            "global\/framework\/templates\/ips.core.templates.js"
+        ],
+        "removed": [
+            "core\/admin\/controllers\/stats\/ips.stats.nodeFilters.js",
+            "core\/admin\/controllers\/stats\/ips.stats.overviewBlock.mixin.js"
+        ]
+    },
+    "orders": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

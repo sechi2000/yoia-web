@@ -1,0 +1,23 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "admin\/customers\/accountInformation",
+            "admin\/customers\/accountInformationTablePreview",
+            "admin\/customers\/altContactsOverview",
+            "admin\/customers\/altContactsOverviewRows",
+            "front\/store\/chooseCurrency"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

@@ -1,0 +1,21 @@
+{
+    "1": {
+        "method": "changeColumn",
+        "params": [
+            "core_attachments",
+            "attach_filesize",
+            {
+                "name": "attach_filesize",
+                "type": "BIGINT",
+                "length": 10,
+                "decimals": null,
+                "values": [],
+                "allow_null": false,
+                "default": 0,
+                "comment": "",
+                "unsigned": false,
+                "auto_increment": false
+            }
+        ]
+    }
+}

@@ -1,0 +1,24 @@
+{
+    "html": {
+        "added": [],
+        "edited": [
+            "front\/browse\/category",
+            "front\/browse\/categoryMenu",
+            "front\/browse\/index",
+            "front\/submit\/submissionForm",
+            "front\/view\/reviews",
+            "front\/view\/view"
+        ],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

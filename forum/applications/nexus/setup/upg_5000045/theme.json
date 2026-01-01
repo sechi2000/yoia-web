@@ -1,0 +1,19 @@
+{
+    "html": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    },
+    "css": {
+        "added": [],
+        "edited": [
+            "admin\/customer.css"
+        ],
+        "removed": []
+    },
+    "resources": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}

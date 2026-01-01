@@ -1,0 +1,16 @@
+{
+    "files": {
+        "added": [],
+        "edited": [
+            "core\/front\/controllers\/core\/ips.core.moderation.js",
+            "core\/front\/controllers\/core\/ips.core.reviewForm.js",
+            "global\/framework\/templates\/ips.core.templates.js"
+        ],
+        "removed": []
+    },
+    "orders": {
+        "added": [],
+        "edited": [],
+        "removed": []
+    }
+}
